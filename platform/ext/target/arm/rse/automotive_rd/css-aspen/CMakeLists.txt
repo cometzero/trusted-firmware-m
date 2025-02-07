@@ -89,6 +89,7 @@ target_compile_definitions(platform_bl2
     PRIVATE
         $<$<BOOL:${PLATFORM_HOST_HAS_SI_CL0}>:PLATFORM_HOST_HAS_SI_CL0>
         $<$<BOOL:${PLATFORM_RSE_HAS_ATU_OWNERSHIP}>:PLATFORM_RSE_HAS_ATU_OWNERSHIP>
+        SCMI_COMMS_FOR_BL2_POLLING_MODE
 )
 
 #========================= Platform Secure ====================================#
@@ -114,4 +115,23 @@ target_sources(platform_s
         ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011/uart_pl011_drv.c>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${CMAKE_CURRENT_SOURCE_DIR}/cmsis_drivers/Driver_USART_pl011.c>
+)
+
+target_compile_definitions(platform_s
+    PUBLIC
+        SCMI_COMMS_FOR_RUNTIME_IRQ_NOTIFICATIONS
+)
+
+#========================= SCMI Hardware Abstraction Layer ====================#
+
+add_library(scmi_hal INTERFACE)
+
+target_include_directories(scmi_hal
+    INTERFACE
+        scmi
+)
+
+target_sources(scmi_hal
+    INTERFACE
+        scmi/scmi_hal.c
 )

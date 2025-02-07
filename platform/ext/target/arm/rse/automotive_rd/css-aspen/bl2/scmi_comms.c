@@ -7,25 +7,11 @@
 #include "bootutil/bootutil_log.h"
 
 #include <assert.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "scmi_comms.h"
 #include "scmi_hal.h"
-
-#define TRANSPORT_BUFFER_STATUS_FREE_POS  0
-#define TRANSPORT_BUFFER_STATUS_FREE_MASK \
-    (UINT32_C(0x1) << TRANSPORT_BUFFER_STATUS_FREE_POS)
-
-#define TRANSPORT_BUFFER_STATUS_ERROR_POS 1
-#define TRANSPORT_BUFFER_STATUS_ERROR_MASK \
-    (UINT32_C(0x1) << TRANSPORT_BUFFER_STATUS_ERROR_POS)
-
-#define TRANSPORT_BUFFER_FLAGS_INTERRUPT_POS 0
-#define TRANSPORT_BUFFER_FLAGS_INTERRUPT_MASK \
-    (UINT32_C(0x1) << TRANSPORT_BUFFER_FLAGS_INTERRUPT_POS)
-
 
 uint32_t scmi_message_header(uint8_t message_id, uint8_t message_type,
                                     uint8_t protocol_id, uint8_t token)
@@ -142,7 +128,7 @@ scmi_comms_err_t transport_wait(void)
         return SCMI_COMMS_HARDWARE_ERROR;
     }
 
-    if (!(value & SI_MHU_MBX_FLAG)) {
+    if (!(value & SI_MHU_COMMAND_MBX_FLAG)) {
         return SCMI_STATUS_GENERIC_ERROR;
     }
 

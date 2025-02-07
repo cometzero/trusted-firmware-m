@@ -12,6 +12,10 @@
 #define __CONFIG_TFM_TARGET_H__
 
 #include "config_tfm_target_rse_common.h"
+#include "device/host_device_cfg.h"
+#include "device/rse_expansion_device_definition.h"
+#include "host_base_address.h"
+#include "platform_irq.h"
 
 /* Set the initial attestation token profile */
 #define ATTEST_TOKEN_PROFILE_PSA_IOT_1           1
@@ -62,5 +66,15 @@
 
 /* Allow NS client ID 0 */
 #define MAILBOX_SUPPORT_NS_CLIENT_ID_ZERO 1
+
+/* IRQ number triggered by SCP doorbell */
+#define SCP_DOORBELL_IRQ MHU_SI_CL0_TO_RSE_IRQn
+
+/* Memory address of SRAM for RSE to SCP communication using SCMI */
+#define SI_CL0_TO_RSE_SRAM_ADDR HOST_RSE_SI_SSRAM_ATU_BASE_S
+
+/* Define RSE Platform interrupts */
+#define PLATFORM_EXPANSION_INTERRUPT_LIST \
+    EXPANSION_INTERRUPT(MHU_SI_CL0_TO_RSE_IRQn, SCP_DOORBELL_IRQ_HANDLER)
 
 #endif /* __CONFIG_TFM_TARGET_H__ */
