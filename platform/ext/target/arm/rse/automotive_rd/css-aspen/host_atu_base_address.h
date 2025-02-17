@@ -42,6 +42,8 @@ enum rse_atu_ids {
     RSE_ATU_SI_ATU_ID,
     /* ATU region ID for programming AP ATU */
     RSE_ATU_AP_ATU_ID,
+    /* ATU region ID for accessing shared memory SRAM bank group 0 in SI */
+    RSE_ATU_SI_SSRAM_ID,
 };
 
 /*
@@ -206,8 +208,16 @@ enum rse_atu_ids {
 #define HOST_RSE_SI_MHU_ATU_PHYS_BASE  0x400003c000000ULL
 #define HOST_RSE_SI_MHU_ATU_SIZE       ALIGN_UP(0x1000000, RSE_ATU_PAGE_SIZE)
 
+/* ATU region mapping to access shared memory SRAM bank group 0 in SI */
+#define HOST_RSE_SI_SSRAM_ATU_BASE_S     (HOST_RSE_SI_MHU_ATU_BASE_S +         \
+                                          HOST_RSE_SI_MHU_ATU_SIZE)
+#define HOST_RSE_SI_SSRAM_ATU_PHYS_BASE  0x4000040000000ULL
+#define HOST_RSE_SI_SSRAM_ATU_SIZE       ALIGN_UP(0x800000, RSE_ATU_PAGE_SIZE)
+#define HOST_RSE_SI_SSRAM_ATU_ID         RSE_ATU_SI_SSRAM_ID
+
 /* ATU region mapping to access SI's ATU from RSE */
-#define HOST_SI_ATU_BASE_S         (HOST_RSE_SI_MHU_ATU_BASE_S + HOST_RSE_SI_MHU_ATU_SIZE)
+#define HOST_SI_ATU_BASE_S         (HOST_RSE_SI_SSRAM_ATU_BASE_S +             \
+                                    HOST_RSE_SI_SSRAM_ATU_SIZE)
 #define HOST_SI_ATU_PHYS_BASE      0x4000031000000ULL
 #define HOST_SI_ATU_GPV_SIZE       ALIGN_UP(0x10000, RSE_ATU_PAGE_SIZE)
 #define HOST_SI_ATU_ID             RSE_ATU_SI_ATU_ID
