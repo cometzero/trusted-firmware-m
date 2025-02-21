@@ -16,12 +16,19 @@
 #include "flash_layout.h"
 #include "flash_map/flash_map.h"
 #include "host_base_address.h"
+#include "mhu_v3_x.h"
 #include "platform_base_address.h"
 #include "platform_regs.h"
+#include "scmi_comms.h"
+#include "scmi_hal.h"
+#include "scmi_power_domain.h"
 #include "tfm_boot_status.h"
 #include "tfm_plat_defs.h"
 
 #include <string.h>
+
+#define SCMI_BUSY_WAIT_CYCLES       1000000000
+#define MAX_RETRIES_PROTOCOL_VER    3
 
 extern struct flash_area flash_map[];
 extern const int flash_map_entry_num;
@@ -195,6 +202,66 @@ int32_t boot_platform_post_init(void)
     return 0;
 }
 
+/*
+ * Last function called before jumping to runtime. Used for final setup and
+ * cleanup.
+ */
+static int boot_platform_finish(void)
+{
+    /* Composite Power Domain state to be set for the AP */
+    uint32_t scmi_pd_state_set = MOD_PD_COMPOSITE_STATE(
+        MOD_PD_LEVEL_2, 0, MOD_PD_STATE_ON, MOD_PD_STATE_ON, MOD_PD_STATE_ON);
+
+    scmi_comms_err_t scmi_err;
+    uint32_t scmi_pd_id = 0;    /*power domain id of the AP*/
+    uint32_t scmi_pd_attributes;
+    uint8_t scmi_pd_name[SCMI_POWER_DOMAIN_NAME_LEN];
+    uint32_t scmi_pd_state_get;
+
+    BOOT_LOG_INF("BL2: AP power domain id = %d.", scmi_pd_id);
+
+    /* Read the attributes of the AP power domain */
+    scmi_err = scmi_comm_power_domain_attributes(scmi_pd_id,
+        &scmi_pd_attributes, &scmi_pd_name[0]);
+
+    if (scmi_err == SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_INF("BL2: AP power domain name = %s.", scmi_pd_name);
+        BOOT_LOG_INF("BL2: AP power domain attributes = 0x%x.",
+            scmi_pd_attributes);
+    } else {
+        BOOT_LOG_ERR("BL2: Fatal, SCMI get power domain attributes failed.");
+        scmi_comm_abort();
+        return 1;
+    }
+
+    /*
+     * Send SCMI command to SI CL0 to indicate that the RSE initialization is
+     * complete and that the SCP-firmware can turn on the AP primary core.
+     */
+    scmi_err = scmi_comm_power_domain_state_set(scmi_pd_id, scmi_pd_state_set);
+
+    if (scmi_err != SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_ERR("BL2: Fatal, RSE to SCP SCMI power on AP failed.");
+        scmi_comm_abort();
+        return 1;
+    }
+
+    /* Read back the power domain state*/
+    scmi_err = scmi_comm_power_domain_state_get(scmi_pd_id,
+        &scmi_pd_state_get);
+
+    if (scmi_err == SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_INF("BL2: AP power domain state = 0x%x.", scmi_pd_state_get);
+    } else {
+        BOOT_LOG_ERR("BL2: Fatal, Read back AP state failed.");
+        scmi_comm_abort();
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: RSE to SCP SCMI power on AP succeeded.");
+    return 0;
+}
+
 static enum atu_error_t initialise_atu_regions(struct atu_dev_t *dev,
                                                uint8_t region_count,
                                                const struct atu_map *regions,
@@ -248,7 +315,7 @@ static int boot_platform_pre_load_secure(void)
 
 static int boot_platform_post_load_secure(void)
 {
-    return 0;
+    return boot_platform_finish();
 }
 
 /*
@@ -289,8 +356,44 @@ static enum atu_error_t initialize_ap_atu(void)
 static int boot_platform_pre_load_ap_bl2(void)
 {
     enum atu_error_t atu_err;
+    scmi_comms_err_t scmi_err;
 
     BOOT_LOG_INF("BL2: AP BL2 pre load start");
+
+    /* Init the SCMI communication context */
+    BOOT_LOG_INF("BL2: Init SCMI comm to SCP ...");
+    scmi_err = scmi_comm_init();
+    BOOT_LOG_INF("BL2: SCMI to SCP share ram address = 0x%x",
+        HOST_RSE_SI_SSRAM_ATU_BASE_S);
+    if (scmi_err == SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_INF("BL2: Init SCMI comm to SCP succeeded");
+    } else {
+        BOOT_LOG_ERR("BL2: Fatal, init SCMI comm to SCP failed");
+        return 1;
+    }
+
+    /* Check if SCP SCMI service is live? */
+    for (uint8_t retries = 0; retries < MAX_RETRIES_PROTOCOL_VER; retries++) {
+        uint32_t scmi_protocol_version;
+
+        BOOT_LOG_INF("BL2: Getting SCMI power domain protocol version...");
+        scmi_err = scmi_comm_get_power_domain_version(&scmi_protocol_version);
+
+        if (scmi_err == SCMI_COMMS_SUCCESS) {
+            BOOT_LOG_INF("BL2: SCP ready. Power domain protocol version = 0x%x.",
+                            scmi_protocol_version);
+            break;
+        }
+        BOOT_LOG_INF("BL2: Failed to get protocol version, retrying...");
+        BOOT_LOG_INF("BL2: Busy wait...");
+        scmi_hal_wait(SCMI_BUSY_WAIT_CYCLES);
+    }
+
+    if (scmi_err != SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_ERR("BL2: SCP is not ready. Abort");
+        scmi_comm_abort();
+        return 1;
+    }
 
     /* Configure RSE ATU to access AP Secure Flash for AP BL2 */
     atu_err = atu_rse_initialize_region(&ATU_DEV_S,

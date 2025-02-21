@@ -56,11 +56,14 @@ target_sources(platform_bl2
     PRIVATE
         bl2/boot_hal_bl2.c
         bl2/flash_map_bl2.c
+        bl2/scmi_comms.c
         cmsis_drivers/Driver_Flash.c
         device/host_device_definition.c
         device/rse_expansion_device_definition.c
         device/tfm_plat_boot_measurement.c
         $<$<BOOL:${PLATFORM_HOST_HAS_SI_CL0}>:${CMAKE_CURRENT_SOURCE_DIR}/host_drivers/ppu_drv.c>
+        scmi/scmi_hal.c
+        scmi/scmi_power_domain.c
         ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi/cfi_drv.c
         ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c
         ${PLATFORM_DIR}/ext/target/arm/rse/common/fip_parser/fip_parser.c
@@ -74,6 +77,7 @@ target_include_directories(platform_bl2
         cmsis_drivers
         device
         host_drivers
+        scmi
         ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi
         ${PLATFORM_DIR}/ext/target/arm/drivers/flash/common
         ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata
