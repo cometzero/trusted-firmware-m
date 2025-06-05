@@ -27,7 +27,8 @@
 
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 
-#define OTP_COUNTER_MAX_SIZE    MAX(COUNTER_BYTES(RSE_OTP_NV_COUNTERS_BANK_0_MAX_VALUE), \
+#define OTP_COUNTER_MAX_SIZE    MAX((COUNTER_BYTES(RSE_OTP_NV_COUNTERS_BANK_0_MAX_VALUE) \
+                                     * RSE_NV_COUNTER_PS_LENGTH_MULTIPLIER),             \
                                 MAX(COUNTER_BYTES(RSE_OTP_NV_COUNTERS_BANK_1_MAX_VALUE), \
                                 MAX(COUNTER_BYTES(RSE_OTP_NV_COUNTERS_BANK_2_MAX_VALUE), \
                                 MAX(COUNTER_BYTES(RSE_OTP_NV_COUNTERS_BANK_3_MAX_VALUE), \

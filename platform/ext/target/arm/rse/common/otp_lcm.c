@@ -12,6 +12,7 @@
 #include "tfm_plat_otp.h"
 #include "tfm_hal_platform.h"
 #include "fatal_error.h"
+#include "rse_nv_counter_mapping.h"
 #include "rse_permanently_disable_device.h"
 #include "rse_zero_count.h"
 #include "rse_zero_count_regions.h"
@@ -505,7 +506,15 @@ static void setup_nv_counter_info(void)
         struct otp_mapping_t mapping =
             USER_AREA_MAPPING(dynamic, security_version_counters_bank_0[idx]);
 
-        otp_mapping[PLAT_OTP_ID_NV_COUNTER_BANK_0_COUNTER + idx] = mapping;
+        if (RSE_NV_COUNTER_PS_AMOUNT && (idx >= BANK_0_COUNTER_PS) &&
+            (idx < BANK_0_COUNTER_PS_MAX)) {
+            /* PS NV Counters are longer to support more writes */
+            mapping.size *= RSE_NV_COUNTER_PS_LENGTH_MULTIPLIER;
+            otp_mapping[PLAT_OTP_ID_NV_COUNTER_BANK_0_COUNTER + idx] = mapping;
+            idx += (RSE_NV_COUNTER_PS_LENGTH_MULTIPLIER - 1);
+        } else {
+            otp_mapping[PLAT_OTP_ID_NV_COUNTER_BANK_0_COUNTER + idx] = mapping;
+        }
     }
 
     for (uint32_t idx = 0; idx < RSE_OTP_NV_COUNTERS_BANK_1_AMOUNT; idx++) {
