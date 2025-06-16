@@ -289,14 +289,14 @@ int32_t scmi_hal_sys_power_state(uint32_t agent_id, uint32_t flags,
      * as an unsupported command in RSE runtime. */
     switch (system_state) {
     case SCMI_SYS_POWER_STATE_SHUTDOWN:
-        SCMI_LOG_SYS("System shutdown complete");
+        SCMI_LOG_NOT("System shutdown complete");
         while (1) {
             __WFI();
         }
         break;
     case SCMI_SYS_POWER_STATE_COLD_RESET:
     case SCMI_SYS_POWER_STATE_WARM_RESET:
-        SCMI_LOG_SYS("Resetting system");
+        SCMI_LOG_NOT("Resetting system");
         tfm_hal_system_reset(TFM_PLAT_SWSYN_DEFAULT);
         break;
     case SCMI_SYS_POWER_STATE_POWER_UP:
