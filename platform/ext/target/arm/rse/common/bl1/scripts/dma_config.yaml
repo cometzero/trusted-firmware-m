@@ -51,6 +51,8 @@ locations:
         base_address: 0x5015D000
     kmu:
         base_address: 0x5009E000
+    ilcu:
+        base_address: 0x58110000
 
 triggers:
      diagnostic_mode: 0
@@ -112,6 +114,7 @@ program:
       - !include include/program4_cmd2.yaml         # Program 4 - Command 2
       - !include include/program4_cmd3.yaml         # Program 4 - Command 3
       - !include include/program4_cmd4.yaml         # Program 4 - Command 4
+      - !include include/program4_cmd5.yaml         # Program 4 - Command 5
 
   - storage_location: "otp"
     execution_location: "vm0"
