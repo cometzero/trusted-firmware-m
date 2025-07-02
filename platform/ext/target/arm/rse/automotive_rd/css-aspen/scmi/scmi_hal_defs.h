@@ -15,7 +15,7 @@ extern "C" {
 
 /* Base address and size of shared memory with SI for SCMI transport */
 #define SI_SHARED_MEMORY_BASE HOST_RSE_SI_SSRAM_ATU_BASE_S
-#define SI_SHARED_MEMORY_SIZE 0x80ULL
+#define SI_SHARED_MEMORY_SIZE 0x100ULL
 
 #define SI_COMMAND_MEMORY_BASE  SI_SHARED_MEMORY_BASE
 
