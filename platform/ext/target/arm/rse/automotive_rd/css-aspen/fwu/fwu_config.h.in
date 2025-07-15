@@ -1,0 +1,49 @@
+/*
+ * Copyright (c) 2025, Arm Limited. All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ */
+
+#ifndef __FWU_CONFIG_H__
+#define __FWU_CONFIG_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* This file contains CSS-Aspen specific configurations in FWU partition */
+
+/* Components if the device. When porting a specific bootloader to FWU partition,
+ * the bootloader specific image types can be defined here.
+ */
+#define FWU_COMPONENT_NUMBER                @NR_OF_IMAGES_IN_FW_BANK@
+
+/* Whether TRIAL component state is supported or not. This is device specific
+ * configuration.
+ */
+#cmakedefine FWU_SUPPORT_TRIAL_STATE
+
+/* Define a dummy candidate_digest[] for CSS-Aspen */
+#define TFM_FWU_MAX_DIGEST_SIZE             (32)
+
+/* The maximum permitted size for block in psa_fwu_write(), in bytes. */
+#define TFM_CONFIG_FWU_MAX_WRITE_SIZE       @TFM_CONFIG_FWU_MAX_WRITE_SIZE@
+
+/* The maximum permitted size for manifest in psa_fwu_start(), in bytes. */
+#define TFM_CONFIG_FWU_MAX_MANIFEST_SIZE    @TFM_CONFIG_FWU_MAX_MANIFEST_SIZE@
+
+/* Number of Firmware Banks */
+#define NR_OF_FW_BANKS                      @NR_OF_FW_BANKS@
+
+/* FWU component indices */
+#define FWU_COMPONENT_INDEX_BL2             0U
+#define FWU_COMPONENT_INDEX_RSE_RUNTIME     1U
+#define FWU_COMPONENT_INDEX_SI_CL0          2U
+#define FWU_COMPONENT_INDEX_AP_FIP_IMAGE    3U
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __FWU_CONFIG_H__ */

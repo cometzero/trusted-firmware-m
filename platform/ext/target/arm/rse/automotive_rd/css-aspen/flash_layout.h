@@ -223,5 +223,17 @@
 #define TFM_HAL_ITS_PROGRAM_UNIT        (1)
 
 #include "flash_layout_common.h"
+/***********************/
+/* FWU Configurations */
+/***********************/
+/* Space in RSE flash to store FWU Private Metadata */
+#define FWU_PRIVATE_METADATA_PARTITION_SIZE     (0x1000)
+#define FWU_PRIVATE_METADATA_REPLICA_1_OFFSET   (0x5000)
+#define FWU_PRIVATE_METADATA_REPLICA_2_OFFSET   (0x6000)
+
+/* Space in AP flash to store FWU Metadata */
+#define FWU_METADATA_PARTITION_SIZE             (0x1000)
+#define FWU_METADATA_REPLICA_1_OFFSET           (0x5000)
+#define FWU_METADATA_REPLICA_2_OFFSET           (0x6000)
 
 #endif /* __FLASH_LAYOUT_H__ */
