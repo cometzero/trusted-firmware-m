@@ -20,6 +20,7 @@
 #include "mhu_v3_x.h"
 #include "platform_base_address.h"
 #include "platform_regs.h"
+#include "rse_expansion_regs.h"
 #include "scmi_comms.h"
 #include "scmi_hal.h"
 #include "scmi_power_domain.h"
@@ -201,6 +202,13 @@ int32_t boot_platform_post_init(void)
 {
     enum atu_error_t atu_err;
     int32_t result;
+
+    struct rse_integ_t *integ_layer =
+        (struct rse_integ_t *)RSE_INTEG_LAYER_BASE_S;
+
+    /* Set the RSE to use the system PLL with 1/1 clock division */
+    integ_layer->rsecoreclk_ctrl = RSE_INTEG_CLKCTRL_SEL_SPLL;
+    integ_layer->rsecoreclk_div = 0;
 
     atu_err = atu_rse_drv_init(&ATU_LIB_S, &ATU_DEV_S, ATU_DOMAIN_SECURE,
                                atu_regions_static, atu_stat_count);

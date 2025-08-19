@@ -14,4 +14,7 @@
 /* Boot flash */
 #define BOOT_FLASH_BASE_S       0xB0000000
 
+/* RSE Integration Layer register block */
+#define RSE_INTEG_LAYER_BASE_S  0x58100000
+
 #endif  /* __RSE_EXPANSION_BASE_ADDRESS_H__ */
