@@ -29,7 +29,6 @@ set(TFM_EXTRAS_REPO_EXTRA_PARTITIONS    "scmi;measured_boot"    CACHE STRING "Li
 set(TFM_LOAD_NS_IMAGE                   OFF      CACHE BOOL    "Whether to load an NS image")
 set(TFM_MANIFEST_LIST                   "${CMAKE_CURRENT_LIST_DIR}/manifest/tfm_manifest_list.yaml" CACHE PATH "Platform specific Secure Partition manifests file")
 set(TFM_MBEDCRYPTO_PLATFORM_EXTRA_CONFIG_PATH "" CACHE PATH    "Config to append to standard Mbed Crypto config, used by platforms to configure feature support")
-set(TFM_MBEDCRYPTO_PSA_CRYPTO_PLATFORM_EXTRA_CONFIG_PATH  ""    CACHE PATH      "Config to append to standard PSA Crypto setting for Mbed Crypto, used by platforms to configure cryptographic feature support.")
 set(TFM_PARTITION_INITIAL_ATTESTATION   ON       CACHE BOOL    "Enable Initial Attestation partition")
 set(TFM_PARTITION_INTERNAL_TRUSTED_STORAGE ON    CACHE BOOL    "Enable Internal Trusted Storage partition")
 set(TFM_PARTITION_MEASURED_BOOT         ON       CACHE BOOL    "Enable Measured Boot partition")
