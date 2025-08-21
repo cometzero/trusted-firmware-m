@@ -27,7 +27,7 @@
 
 #include <string.h>
 
-#define SCMI_BUSY_WAIT_CYCLES       1000000000
+#define SCMI_BUSY_WAIT_CYCLES       10000000
 #define MAX_RETRIES_PROTOCOL_VER    3
 
 extern struct flash_area flash_map[];
