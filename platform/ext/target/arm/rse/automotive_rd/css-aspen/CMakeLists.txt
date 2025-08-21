@@ -120,6 +120,7 @@ target_sources(platform_s
 target_compile_definitions(platform_s
     PUBLIC
         SCMI_COMMS_FOR_RUNTIME_IRQ_NOTIFICATIONS
+        SFCP_ATU_REGION_SIZE=${SFCP_ATU_REGION_SIZE}
 )
 
 #========================= SCMI Hardware Abstraction Layer ====================#
