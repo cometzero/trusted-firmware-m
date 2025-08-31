@@ -72,9 +72,7 @@ extern ARM_DRIVER_FLASH FLASH_DEV_NAME;
 
 /* List the MPU regions to be configured */
 enum {
-#if !(defined(LOGGING_ENABLED) && defined(RSE_USE_HOST_UART))
     ATU_WINDOW_REGION_CFG_NR = 0, /*!< Required for ATU config, not always present */
-#endif
     ROM_REGION_CFG_NR             /*!< Always configured last as it's required to disable ROM exec */
 };
 
@@ -122,7 +120,6 @@ uint32_t bl1_image_get_flash_offset(uint32_t image_id)
 }
 #endif
 
-#if !(defined(LOGGING_ENABLED) && defined(RSE_USE_HOST_UART))
 static int32_t init_mpu_region_for_atu(void)
 {
     static struct mpu_armv8m_dev_t dev_mpu_s = { MPU_BASE };
@@ -149,8 +146,6 @@ static int32_t init_mpu_region_for_atu(void)
 
     return mpu_armv8m_enable(&dev_mpu_s, PRIVILEGED_DEFAULT_ENABLE, HARDFAULT_NMI_ENABLE);
 }
-
-#endif /* !(defined(LOGGING_ENABLED) && defined(RSE_USE_HOST_UART)) */
 
 #ifdef RSE_SUPPORT_ROM_LIB_RELOCATION
 static void setup_got_register(void)

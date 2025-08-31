@@ -57,7 +57,6 @@ extern ARM_DRIVER_FLASH FLASH_DEV_NAME;
 
 REGION_DECLARE(Image$$, ARM_LIB_STACK, $$ZI$$Base);
 
-#if defined(LOGGING_ENABLED) && defined(RSE_USE_HOST_UART)
 static struct mpu_armv8m_dev_t dev_mpu_s = { MPU_BASE };
 
 static int32_t init_mpu_region_for_atu(void)
@@ -86,7 +85,6 @@ static int32_t init_mpu_region_for_atu(void)
     FIH_CALL(mpu_armv8m_enable, rc, &dev_mpu_s, PRIVILEGED_DEFAULT_ENABLE, HARDFAULT_NMI_ENABLE);
     return rc;
 }
-#endif /* defined(LOGGING_ENABLED) && defined(RSE_USE_HOST_UART) */
 
 static void wait_for_vm_erase_to_finish_and_enable_cache(void)
 {
@@ -169,10 +167,8 @@ int32_t boot_platform_init(void)
     struct rse_sacfg_t *sacfg = (struct rse_sacfg_t *)RSE_SACFG_BASE_S;
     sacfg->secrespcfg |= CMSDK_SECRESPCFG_BUS_ERR_MASK;
 
-#ifdef LOGGING_ENABLED
-#ifdef RSE_USE_HOST_UART
     /**
-     * If we are using the ATU to map the host UART into the RSE memory
+     * If we are using the ATU to map host devices into the RSE memory
      * map then we also need to configure the MPU to ensure that the
      * address space we access from the RSE is marked as device memory
      * to avoid CPU caching. In this case, we also configure the entire
@@ -184,6 +180,7 @@ int32_t boot_platform_init(void)
         return err;
     }
 
+#ifdef RSE_USE_HOST_UART
     /* Initialize ATU driver */
     err = atu_rse_drv_init(&ATU_LIB_S, &ATU_DEV_S, ATU_DOMAIN_ROOT,
                            atu_regions_static, atu_stat_count);
@@ -192,6 +189,7 @@ int32_t boot_platform_init(void)
     }
 #endif /* RSE_USE_HOST_UART */
 
+#ifdef LOGGING_ENABLED
     stdio_init();
 #endif /* LOGGING_ENABLED */
 
