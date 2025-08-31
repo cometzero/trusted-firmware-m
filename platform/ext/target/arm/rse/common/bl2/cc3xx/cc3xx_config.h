@@ -47,7 +47,7 @@
 /* Whether the AES tunnelling support is enabled. Without this, running CCM mode
  * AES will instead only run the CBC_MAC operation with the CCM IVs, with the
  * CTR decryption having to be done separately. */
-#define CC3XX_CONFIG_AES_TUNNELLING_ENABLE
+/* #define CC3XX_CONFIG_AES_TUNNELLING_ENABLE */
 
 /* Whether an external key-loader should be invoked instead of the standard AES
  * hardware key loading mechanism
