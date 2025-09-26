@@ -13,6 +13,7 @@
 #include "device_definition.h"
 #include "fih.h"
 #include "fip_parser.h"
+#include "fwu_hal_bl2.h"
 #include "flash_layout.h"
 #include "flash_map/flash_map.h"
 #include "host_base_address.h"
@@ -36,26 +37,40 @@ extern ARM_DRIVER_FLASH AP_FLASH_DEV_NAME;
 
 static int32_t fill_secure_flash_map_with_data(void)
 {
-    uint64_t tfa_offset = 0;
-    size_t tfa_size = 0;
+    uint64_t ap_bl2_offset = 0;
+    size_t ap_bl2_size = 0;
     enum tfm_plat_err_t result;
-    uint8_t i, id, flash_id;
+    uint8_t i, id, primary_flash_id, secondary_flash_id;
+    uint32_t ap_image_offset;
+    uint8_t boot_index;
+
+    boot_index = get_active_boot_index();
+
+    if (boot_index == FWU_BANK_0) {
+        /* Set flash_map[] of AP BL2 both slot offsets to Primary Slot offset */
+        ap_image_offset = AP_FLASH_AREA_0_OFFSET;
+    } else {
+        /* Set flash_map[] of AP BL2 both slot offsets to Secondary Slot offset */
+        ap_image_offset = AP_FLASH_AREA_1_OFFSET;
+    }
 
     result = fip_get_entry_by_uuid(&AP_FLASH_DEV_NAME,
-                AP_FLASH_FIP_OFFSET, AP_FLASH_FIP_SIZE,
-                UUID_TRUSTED_BOOT_FIRMWARE_BL2, &tfa_offset, &tfa_size);
+                                   ap_image_offset, AP_FLASH_FIP_SIZE,
+                                   UUID_TRUSTED_BOOT_FIRMWARE_BL2,
+                                   &ap_bl2_offset, &ap_bl2_size);
     if (result != TFM_PLAT_ERR_SUCCESS) {
         return 1;
     }
 
-    flash_id = FLASH_AREA_IMAGE_PRIMARY(RSE_FIRMWARE_AP_BL2_ID);
+    primary_flash_id = FLASH_AREA_IMAGE_PRIMARY(RSE_FIRMWARE_AP_BL2_ID);
+    secondary_flash_id = FLASH_AREA_IMAGE_SECONDARY(RSE_FIRMWARE_AP_BL2_ID);
 
     for (i = 0; i < flash_map_entry_num; i++) {
         id = flash_map[i].fa_id;
 
-        if (id == flash_id) {
-            flash_map[i].fa_off = AP_FLASH_FIP_OFFSET + tfa_offset;
-            flash_map[i].fa_size = tfa_size;
+        if ((id == primary_flash_id) || (id == secondary_flash_id)) {
+            flash_map[i].fa_off = ap_image_offset + ap_bl2_offset;
+            flash_map[i].fa_size = ap_bl2_size;
         }
     }
 
@@ -197,9 +212,11 @@ int32_t boot_platform_post_init(void)
         return 1;
     }
 
+    result = fwu_hal_bl2_update_state_and_flashmap();
+
     (void)fih_delay_init();
 
-    return 0;
+    return result;
 }
 
 /*

@@ -41,6 +41,8 @@ target_include_directories(platform_bl1_1_interface
 #========================= Platform BL1_2 =====================================#
 
 target_include_directories(platform_bl1_2
+    PRIVATE
+        $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu>
     PUBLIC
         cmsis_drivers
         device
@@ -48,6 +50,12 @@ target_include_directories(platform_bl1_2
         ${PLATFORM_DIR}/ext/target/arm/drivers/flash/common
         ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011>
+)
+
+target_sources(platform_bl1_2
+    PUBLIC
+        $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu/fwu_hal_bl1_2.c>
+        $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu/fwu_private_metadata.c>
 )
 
 #========================= Platform BL2 =======================================#
@@ -70,9 +78,13 @@ target_sources(platform_bl2
         ${PLATFORM_DIR}/ext/target/arm/rse/common/fip_parser/fip_parser.c
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011/uart_pl011_drv.c>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${CMAKE_CURRENT_SOURCE_DIR}/cmsis_drivers/Driver_USART_pl011.c>
+        $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu/fwu_hal_bl2.c>
+        $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu/fwu_private_metadata.c>
 )
 
 target_include_directories(platform_bl2
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/fwu
     PUBLIC
         bl2
         cmsis_drivers
