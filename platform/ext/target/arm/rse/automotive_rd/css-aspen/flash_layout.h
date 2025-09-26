@@ -226,6 +226,9 @@
 /***********************/
 /* FWU Configurations */
 /***********************/
+#define FWU_BANK_0                      (0)
+#define FWU_BANK_1                      (1)
+
 /* Space in RSE flash to store FWU Private Metadata */
 #define FWU_PRIVATE_METADATA_PARTITION_SIZE     (0x1000)
 #define FWU_PRIVATE_METADATA_REPLICA_1_OFFSET   (0x5000)
