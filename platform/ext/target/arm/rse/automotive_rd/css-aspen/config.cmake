@@ -36,6 +36,16 @@ set(TFM_PARTITION_PROTECTED_STORAGE     ON       CACHE BOOL    "Enable Protected
 set(TFM_PARTITION_SCMI_COMMS            ON       CACHE BOOL    "Enable SCMI Comms partition")
 set(SFCP_ATU_REGION_SIZE                0x20000  CACHE STRING  "The size of the carveout region")
 set(SFCP_NUMBER_NODES                   3        CACHE STRING  "Amount of nodes in the SFCP system, by default equal to number of RSEs")
+set(RSE_COMMS_ATU_REGION_SIZE           0x20000  CACHE STRING  "The size of the carveout region")
+set(RSE_COMMS_NUMBER_NODES              3        CACHE STRING  "Amount of nodes in the RSE comms system, by default equal to number of RSEs")
+set(PLATFORM_HAS_FIRMWARE_UPDATE_SUPPORT   ON    CACHE BOOL    "Whether the platform has firmware update support")
+set(TFM_PARTITION_FIRMWARE_UPDATE       ON       CACHE BOOL    "Enable firmware update partition")
+set(TFM_FWU_BOOTLOADER_LIB              "${CMAKE_SOURCE_DIR}/platform/ext/target/arm/rse/automotive_rd/css-aspen/fwu"   CACHE STRING    "Bootloader configure file for Firmware Update partition")
+set(FWU_DEVICE_CONFIG_FILE              "${CMAKE_BINARY_DIR}/generated/interface/include/psa/fwu_config.h"              CACHE STRING    "The device configuration file for Firmware Update partition")
+set(NR_OF_FW_BANKS                      2        CACHE STRING  "Number of firmware banks")
+set(NR_OF_IMAGES_IN_FW_BANK             4        CACHE STRING  "Number of images per firmware bank")
+set(FWU_SUPPORT_TRIAL_STATE             ON       CACHE BOOL    "Device support TRIAL component state.")
+set(TFM_CONFIG_FWU_MAX_WRITE_SIZE       4096     CACHE STRING  "The maximum permitted size for block in psa_fwu_write, in bytes.")
 
 # Once all cache options are set, set common options as fallback
 include(${CMAKE_CURRENT_LIST_DIR}/../../common/config.cmake)

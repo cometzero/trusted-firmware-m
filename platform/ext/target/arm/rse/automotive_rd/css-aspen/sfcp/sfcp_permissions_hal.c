@@ -34,6 +34,10 @@
 #include "tfm_attest_defs.h"
 #endif /* TFM_PARTITION_INITIAL_ATTESTATION */
 
+#ifdef TFM_PARTITION_FIRMWARE_UPDATE
+#include "tfm_fwu_defs.h"
+#endif /* TFM_PARTITION_FIRMWARE_UPDATE */
+
 #define INVALID_REGION_COUNTER_MAX  128
 #define INVALID_SERVICE_COUNTER_MAX 64
 
@@ -168,6 +172,24 @@ enum tfm_plat_err_t comms_permissions_service_check(psa_handle_t handle, const p
             goto out_err;
         }
 #endif /* TFM_PARTITION_INITIAL_ATTESTATION */
+#ifdef TFM_PARTITION_FIRMWARE_UPDATE
+    case TFM_FIRMWARE_UPDATE_SERVICE_HANDLE:
+        switch(type) {
+        case TFM_FWU_START:
+        case TFM_FWU_WRITE:
+        case TFM_FWU_FINISH:
+        case TFM_FWU_CANCEL:
+        case TFM_FWU_INSTALL:
+        case TFM_FWU_CLEAN:
+        case TFM_FWU_REJECT:
+        case TFM_FWU_REQUEST_REBOOT:
+        case TFM_FWU_ACCEPT:
+        case TFM_FWU_QUERY:
+            return TFM_PLAT_ERR_SUCCESS;
+        default:
+            goto out_err;
+        }
+#endif /* TFM_PARTITION_FIRMWARE_UPDATE */
     default:
         goto out_err;
     }
