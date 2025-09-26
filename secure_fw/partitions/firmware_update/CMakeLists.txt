@@ -20,6 +20,7 @@ target_include_directories(tfm_psa_rot_partition_fwu
         ${CMAKE_SOURCE_DIR}/secure_fw/include
     PRIVATE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/bootloader>
         ${CMAKE_BINARY_DIR}/generated/secure_fw/partitions/firmware_update
 )
 target_include_directories(tfm_partitions
