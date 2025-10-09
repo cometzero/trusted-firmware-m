@@ -241,7 +241,7 @@ enum rse_atu_ids {
 #define HOST_RSE_SI_SSRAM_ATU_BASE_S     (HOST_RSE_SI_MHU_ATU_BASE_S +         \
                                           HOST_RSE_SI_MHU_ATU_SIZE)
 #define HOST_RSE_SI_SSRAM_ATU_PHYS_BASE  0x4000040000000ULL
-#define HOST_RSE_SI_SSRAM_ATU_SIZE       ALIGN_UP(0x800000, RSE_ATU_PAGE_SIZE)
+#define HOST_RSE_SI_SSRAM_ATU_SIZE       ALIGN_UP(0x40000, RSE_ATU_PAGE_SIZE)
 #define HOST_RSE_SI_SSRAM_ATU_ID         RSE_ATU_SI_SSRAM_ID
 
 /* ATU region mapping to access SI's ATU from RSE */

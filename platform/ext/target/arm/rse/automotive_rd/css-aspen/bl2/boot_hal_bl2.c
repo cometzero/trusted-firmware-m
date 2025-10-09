@@ -81,6 +81,32 @@ static int32_t fill_secure_flash_map_with_data(void)
     return 0;
 }
 
+static void clear_safety_island_memory(const struct scr_dev_t *scr_dev)
+{
+    volatile scr_t *scr = (volatile scr_t *)scr_dev->scr_base;
+
+    const uint32_t memprot_mask = (1U << MEMPROTCTLR_LM0_MEMPROTEN_BIT) |
+                                  (1U << MEMPROTCTLR_SH1_MEMPROTEN_BIT);
+
+    /* Turn off Memory protection control */
+    scr->memprotctlr &= ~memprot_mask;
+
+    /*
+     * Initialize LM0 contents, by writing a constant 0 value to the whole space
+     * where the boot image(s) will occupy in the future.
+     */
+    memset((void *)HOST_SI_CL0_IMG_CODE_BASE_S, 0, SIZE_DEF_SI_CL0_IMAGE);
+
+    /*
+     * Initialize SH1 contents, by writing a constant 0 value to the whole space
+     * where the RSE CL0 MHU payloads will occupy in the future.
+     */
+    memset((void *)HOST_RSE_SI_SSRAM_ATU_BASE_S, 0, HOST_RSE_SI_SSRAM_ATU_SIZE);
+
+    /* Turn on Memory protection control */
+    scr->memprotctlr |= memprot_mask;
+}
+
 #if defined(TFM_MEASURED_BOOT_API) || defined(TFM_PARTITION_FIRMWARE_UPDATE)
 
 int boot_add_data_to_shared_area(uint8_t major_type,
@@ -662,6 +688,7 @@ static int boot_platform_pre_load_si_cl0(void)
     enum atu_error_t atu_err;
     enum ppu_error_t ppu_err;
     int error;
+    volatile scr_t *scr = (volatile scr_t *)HOST_SI_SCR_DEV.scr_base;
 
     BOOT_LOG_INF("BL2: SI CL0 pre load start");
 
@@ -733,6 +760,40 @@ static int boot_platform_pre_load_si_cl0(void)
                                         HOST_SI_CL0_IMG_CODE_BASE_S,
                                         HOST_SI_CL0_PHYS_BASE,
                                         HOST_SI_CL0_ATU_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access SI System Control Registers */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access SI Shared SRAM */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_SI_SSRAM_ID,
+                                        HOST_RSE_SI_SSRAM_ATU_BASE_S,
+                                        HOST_RSE_SI_SSRAM_ATU_PHYS_BASE,
+                                        HOST_RSE_SI_SSRAM_ATU_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    clear_safety_island_memory(&HOST_SI_SCR_DEV);
+
+    /* Close RSE ATU region configured to access SI System Control Registers */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access SI Shared SRAM */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_SI_SSRAM_ID);
     if (atu_err != ATU_ERR_NONE) {
         return 1;
     }

@@ -15,6 +15,12 @@
 extern "C" {
 #endif
 
+/* MEMPROTCTLR bit positions */
+#define MEMPROTCTLR_LM0_MEMPROTEN_BIT   0U
+#define MEMPROTCTLR_LM1_MEMPROTEN_BIT   1U
+#define MEMPROTCTLR_SH1_MEMPROTEN_BIT   4U
+#define MEMPROTCTLR_SH2_MEMPROTEN_BIT   5U
+
 typedef union system_cfg_type{
     struct{
         uint32_t cl1_present: 1;
@@ -58,9 +64,21 @@ typedef struct scr_type {
     __IM  system_cfg_t sid_system_cfg;  /* 0x70 */
     const uint8_t reserved5[652];       /* reserved 652 bytes */
     __IOM cpuhalt_t cpuhalt;            /* 0x300 */
-    const uint8_t reserved6[764];       /* reserved 764 bytes */
+    const uint8_t reserved6[508];       /* reserved 508 bytes */
+    __IOM uint32_t memprotctlr;         /* 0x500 */
+    const uint8_t reserved7[252];       /* reserved 252 bytes */
     __IOM uint32_t safectlr;            /* 0x600 */
-    const uint8_t reserved7[2556];      /* reserved 2556 bytes */
+    const uint8_t reserved8[2508];      /* reserved 2508 bytes */
+    __IM  uint32_t sid_pidr4;           /* 0xFD0 */
+    const uint8_t reserved9[12];        /* reserved 12 bytes */
+    __IM  uint32_t sid_pidr0;           /* 0xFE0 */
+    __IM  uint32_t sid_pidr1;           /* 0xFE4 */
+    __IM  uint32_t sid_pidr2;           /* 0xFE8 */
+    __IM  uint32_t sid_pidr3;           /* 0xFEC */
+    __IM  uint32_t sid_cidr0;           /* 0xFF0 */
+    __IM  uint32_t sid_cidr1;           /* 0xFF4 */
+    __IM  uint32_t sid_cidr2;           /* 0xFF8 */
+    __IM  uint32_t sid_cidr3;           /* 0xFFC */
 }scr_t;
 
 /* SCR device definition */
