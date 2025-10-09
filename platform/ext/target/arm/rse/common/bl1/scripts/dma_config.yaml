@@ -68,6 +68,7 @@ program:
       - !include include/program0_cmd0.yaml         # Program 0 - Command 0
       - !include include/program0_cmd1.yaml         # Program 0 - Command 1
       - !include include/program0_cmd2.yaml         # Program 0 - Command 2
+      - !include include/program0_cmd3.yaml         # Program 0 - Command 3
 
   - storage_location: "rom"
     execution_location: "rom"

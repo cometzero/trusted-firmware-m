@@ -1,24 +1,35 @@
 #-------------------------------------------------------------------------------
-# Copyright (c) 2023-2024, Arm Limited. All rights reserved.
+# Copyright (c) 2025, Arm Limited. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
 #-------------------------------------------------------------------------------
 
-# This command sets DMA boot enable to 0.
+# Write to LCM seed registers to allow the LCM to start its operation.
+# Also set LCM_SEED_CTRL which controls the see_valid signal, this allows
+# it to contribute to the setting of the lcm_seed_lfsr_valid signal.
 
 CTRL:
-    XTYPE: 'fill'
+    XTYPE: 'continue'
     TRANSIZE: 'word'
     USEGPO: 1
-DESADDR: 'rse_system_control_registers_base_address + reg_offset_system_control_dma_boot_en'
+    DONETYPE: 1
 XSIZE:
-    DES: 1
+    SRC: 3
+    DES: 3
+SRCADDR: 'program0_cmd0_store_addr + program0_cmd0_size - 0xC'
+DESADDR: 'ilcu_base_address + 0x60'
+SRCTRANSCFG:
+  SRCMEMATTR: 'normal_non_cacheable_non_shareable'
 DESTRANSCFG:
     DESMEMATTR: 'device'
-FILLVAL: 0x00000000
-GPOEN0: 0x0000001F
-GPOVAL0: 0x00000001
+XADDRINC:
+    SRC: 1
+    DES: 1
 LINKATTR:
   LINKMEMATTR: 'normal_non_cacheable_non_shareable'
 LINKADDR: "program0_cmd1_exec_addr"
+
+SD0: 0xDEADBEEF
+SD1: 0x2BADFEED
+SD_CTL: 0x1
