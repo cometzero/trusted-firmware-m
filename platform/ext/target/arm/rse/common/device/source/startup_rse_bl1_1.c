@@ -240,7 +240,7 @@ static inline void __attribute__ ((always_inline)) erase_vm0_and_vm1(void)
     if (RSE_GET_PERSISTENT_DATA_INITIALIZED_FLAG()) {
         vm_erase_size = (VM0_SIZE + VM1_SIZE - VM_COLD_RESET_RETAINED_SIZE);
     } else {
-        vm_erase_size = (VM0_SIZE + VM1_SIZE);
+        vm_erase_size = (VM0_SIZE + VM1_SIZE - RETAINED_RAM_SIZE);
     }
 
     if (vm_erase_size == 0) {
