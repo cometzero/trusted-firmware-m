@@ -163,7 +163,7 @@ struct atu_map si_atu_regions[SI_ATU_REGION_COUNT] = {
         .log_addr = 0xE0130000UL,
         .phy_addr = 0x100000ULL,
         .size = 0x100000UL,
-        .bus_attr = ATU_ENCODE_ATTRIBUTES_NON_SECURE_PAS,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
     [SI_ATU_REGION_IDX_SMD_SMCF_MGI] = {
         .log_addr = 0xE0230000UL,
@@ -171,14 +171,14 @@ struct atu_map si_atu_regions[SI_ATU_REGION_COUNT] = {
         .size = 0x10000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
-    [SI_ATU_REGION_IDX_SMCF_SRAM] = {
+    [SI_ATU_REGION_IDX_SMD_SRAM] = {
         .log_addr = 0xE0240000UL,
         .phy_addr = 0x2000060000000ULL,
-        .size = 0x4000UL,
+        .size = 0x100000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
     /* 
-     * Do not use 0xE0340000 to 0xE0360000 since it is occupied for
+     * Do not use 0xE0340000 to 0xE0342000 since it is occupied for
      * SMDExpansion-to-SMD region (SMCF)
      */
 };
@@ -192,7 +192,7 @@ struct atu_dev_t HOST_SMDEXP2SMD_ATU_DEV = {
 
 const struct atu_map smdexp2smd_atu_regions[SMDEXP2SMD_ATU_REGION_COUNT] = {
     [SMDEXP2SMD_ATU_REGION_IDX_SMCF_SRAM] = {
-        .log_addr = 0xE0244000UL,
+        .log_addr = 0xE0340000UL,
         .phy_addr = 0x2000060002000ULL,
         .size = 0x2000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
