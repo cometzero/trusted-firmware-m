@@ -47,6 +47,7 @@ set(NR_OF_IMAGES_IN_FW_BANK             4        CACHE STRING  "Number of images
 set(FWU_SUPPORT_TRIAL_STATE             ON       CACHE BOOL    "Device support TRIAL component state.")
 set(TFM_CONFIG_FWU_MAX_WRITE_SIZE       4096     CACHE STRING  "The maximum permitted size for block in psa_fwu_write, in bytes.")
 set(MCUBOOT_CUSTOM_DATA_SHARING_FUNCTION   ON    CACHE BOOL    "Enable platform-defined data sharing function between the bootloader and runtime firmware")
+set(FWU_DEVICE_IMPL_INFO_DEF_FILE       "${CMAKE_CURRENT_LIST_DIR}/fwu/tfm_fwu_impl_info.h"    CACHE STRING    "The platform specific header file defining psa_fwu_impl_info_t structure")
 
 # Once all cache options are set, set common options as fallback
 include(${CMAKE_CURRENT_LIST_DIR}/../../common/config.cmake)

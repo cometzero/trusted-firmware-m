@@ -21,6 +21,9 @@ target_include_directories(tfm_bootloader_fwu_abstraction
         ${CMAKE_SOURCE_DIR}/platform/ext/target/arm/rse/common/fip_parser
         ${CMAKE_SOURCE_DIR}/platform/ext/target/arm/rse/common
         ${CMAKE_SOURCE_DIR}/secure_fw/partitions/lib/runtime/include
+        ${MCUBOOT_PATH}/boot/bootutil/include
+        ${CMAKE_BINARY_DIR}/bl2/ext/mcuboot
+        ${CMAKE_SOURCE_DIR}/bl1/bl1_2/lib/interface
 )
 
 target_sources(tfm_bootloader_fwu_abstraction
@@ -29,7 +32,9 @@ target_sources(tfm_bootloader_fwu_abstraction
         ${CMAKE_CURRENT_SOURCE_DIR}/fwu_metadata.c
         ${CMAKE_CURRENT_SOURCE_DIR}/fwu_private_metadata.c
         ${CMAKE_CURRENT_SOURCE_DIR}/fwu_flash.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/fwu_esrt.c
         ${CMAKE_SOURCE_DIR}/platform/ext/target/arm/rse/common/soft_crc/soft_crc.c
+        ${CMAKE_SOURCE_DIR}/platform/ext/target/arm/rse/common/fip_parser/fip_parser.c
 )
 
 target_link_libraries(tfm_bootloader_fwu_abstraction

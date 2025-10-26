@@ -70,8 +70,34 @@ const struct fwu_image_location* fwu_get_image_location(psa_fwu_component_t comp
     return NULL;
 }
 
-psa_status_t fwu_flash_write(ARM_DRIVER_FLASH *flash, uint32_t partition_offset,
-                             const void *data, uint32_t size)
+psa_status_t fwu_flash_read(ARM_DRIVER_FLASH *flash, uint32_t partition_offset,
+                            void *data, uint32_t size)
+{
+    int ret;
+
+    if (flash == NULL || data == NULL) {
+        return PSA_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (flash == &AP_FLASH_DEV_NAME) {
+        INIT_ATU_REGION_FOR_AP_FLASH();
+    }
+
+    ret = flash->ReadData(partition_offset, data, size);
+
+    if (flash == &AP_FLASH_DEV_NAME) {
+        DEINIT_ATU_REGION_FOR_AP_FLASH();
+    }
+
+    if (ret < 0) {
+        return PSA_ERROR_STORAGE_FAILURE;
+    }
+
+    return PSA_SUCCESS;
+}
+
+psa_status_t fwu_flash_write(ARM_DRIVER_FLASH *flash, uint32_t partition_offset, const void *data,
+                             uint32_t size)
 {
     int ret;
 

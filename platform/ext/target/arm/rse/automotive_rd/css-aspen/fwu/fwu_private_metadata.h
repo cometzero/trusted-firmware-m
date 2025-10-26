@@ -10,7 +10,6 @@
 
 #include "psa/error.h"
 #include "psa/update.h"
-
 #include <stdint.h>
 
 /*
@@ -18,6 +17,13 @@
  * as combined state for Shim layer
  */
 #define PSA_FWU_WRITING_CANDIDATE   (8u)
+
+/* ESRT entries */
+struct esrt_info_entry {
+    uint32_t lowest_supported_fw_version;
+    uint32_t last_attempt_version;
+    uint32_t last_attempt_status;
+};
 
 /**
  * Aspen specific FWU Private metadata is stored in RSE FLASH
@@ -28,6 +34,8 @@ struct fwu_private_metadata {
 
     /* FWU state of image component */
     uint8_t fwu_image_state[FWU_COMPONENT_NUMBER];
+
+    struct esrt_info_entry esrt_entries[FWU_COMPONENT_NUMBER];
 };
 
 psa_status_t fwu_private_metadata_init(void);

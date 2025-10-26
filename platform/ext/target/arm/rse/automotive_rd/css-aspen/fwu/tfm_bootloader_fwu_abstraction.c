@@ -5,16 +5,21 @@
  *
  */
 
+#include <assert.h>
+#include <fip_parser.h>
+#include <platform_error_codes.h>
+#include <string.h>
+#include "bootutil/image.h"
 #include "flash_layout.h"
+#include "fwu_esrt.h"
 #include "fwu_flash.h"
 #include "fwu_metadata_v2.h"
 #include "fwu_private_metadata.h"
+#include "psa/error.h"
 #include "psa/update.h"
+#include "tfm_boot_status.h"
 #include "tfm_bootloader_fwu_abstraction.h"
 #include "tfm_log.h"
-
-#include <assert.h>
-#include <string.h>
 
 #define LOG_TAG "FWU_SHIM: "
 
@@ -73,7 +78,14 @@ psa_status_t fwu_bootloader_init(void)
         return status;
     }
 
-    return fwu_metadata_read(&fwu_mdata);
+    status = fwu_metadata_read(&fwu_mdata);
+    if (status != PSA_SUCCESS) {
+        return status;
+    }
+
+    status = esrt_init_boot_data();
+
+    return status;
 }
 
 psa_status_t fwu_bootloader_staging_area_init(psa_fwu_component_t component,
@@ -131,11 +143,18 @@ psa_status_t fwu_bootloader_load_image(psa_fwu_component_t component,
 psa_status_t fwu_bootloader_install_image(const psa_fwu_component_t *candidates,
                                           uint8_t number)
 {
-    uint8_t update_bank;
+    uint8_t update_bank, idx;
     psa_status_t status;
 
     if (candidates == NULL) {
         return PSA_ERROR_INVALID_ARGUMENT;
+    }
+
+    for (idx = 0; idx < number; idx++) {
+        status = esrt_update_last_attempt(&private_mdata, candidates[idx]);
+        if (status != PSA_SUCCESS) {
+            return status;
+        }
     }
 
     status = fwu_update_components_state(candidates, number, PSA_FWU_STAGED);
@@ -180,19 +199,27 @@ psa_status_t fwu_bootloader_mark_image_accepted(const psa_fwu_component_t *trial
         return status;
     }
 
+    active_index = fwu_mdata.active_index;
+    for (int idx = 0; idx < number; idx++) {
+        fwu_mdata.fw_desc.img_entry[trials[idx]].img_props[active_index].accepted =
+                FWU_IMAGE_ACCEPTED;
+        private_mdata.esrt_entries[trials[idx]].last_attempt_status = LAST_ATTEMPT_STATUS_SUCCESS;
+
+        /* lowest_supported_fw_version should be updated when the
+         * security counter increases. For now we are relying on
+         * last_attempt_version. */
+        private_mdata.esrt_entries[trials[idx]].lowest_supported_fw_version =
+            private_mdata.esrt_entries[trials[idx]].last_attempt_version;
+    }
+    fwu_mdata.bank_state[active_index] = FWU_BANK_STATE_ACCEPTED;
+
     status = fwu_private_metadata_write(&private_mdata);
     if (status != PSA_SUCCESS) {
         return status;
     }
 
-    active_index = fwu_mdata.active_index;
-    for (int idx = 0; idx < number; idx++) {
-        fwu_mdata.fw_desc.img_entry[trials[idx]].img_props[active_index].accepted =
-                FWU_IMAGE_ACCEPTED;
-    }
-    fwu_mdata.bank_state[active_index] = FWU_BANK_STATE_ACCEPTED;
-
-    return fwu_metadata_write(&fwu_mdata);
+    status = fwu_metadata_write(&fwu_mdata);
+    return status;
 }
 
 /* Reject the staged image. */
@@ -259,20 +286,28 @@ psa_status_t fwu_bootloader_abort(psa_fwu_component_t component)
     return PSA_ERROR_NOT_SUPPORTED;
 }
 
-psa_status_t fwu_bootloader_get_image_info(psa_fwu_component_t component,
-                                           bool query_state,
-                                           bool query_impl_info,
-                                           psa_fwu_component_info_t *info)
+static void construct_impl_info(psa_fwu_component_t component,
+                                psa_fwu_impl_info_t *impl_info)
+{
+    impl_info->lowest_supported_fw_version =
+            private_mdata.esrt_entries[component].lowest_supported_fw_version;
+    impl_info->last_attempt_version =
+                    private_mdata.esrt_entries[component].last_attempt_version;
+    impl_info->last_attempt_status =
+                    private_mdata.esrt_entries[component].last_attempt_status;
+    impl_info->fw_type = ESRT_FW_TYPE_SYSTEMFIRMWARE;
+}
+
+psa_status_t fwu_bootloader_get_image_info(psa_fwu_component_t component, bool query_state,
+                                           bool query_impl_info, psa_fwu_component_info_t *info)
 {
     const struct fwu_image_location *image_bank;
     psa_status_t status;
+    struct psa_fwu_image_version_t fwu_version;
+    uint32_t version = 0;
 
     if (info == NULL) {
         return PSA_ERROR_INVALID_ARGUMENT;
-    }
-
-    if (query_impl_info) {
-        WARN(LOG_TAG "currently implementation info not supported\n");
     }
 
     if (query_state) {
@@ -282,6 +317,16 @@ psa_status_t fwu_bootloader_get_image_info(psa_fwu_component_t component,
     image_bank = fwu_get_image_location(component);
     info->max_size = image_bank->partition_size;
     info->location = image_bank->partition_offset[fwu_mdata.active_index];
+
+    status = esrt_get_active_image_version(&private_mdata, component, &fwu_version);
+    if (status != PSA_SUCCESS) {
+        return status;
+    }
+    info->version = fwu_version;
+
+    if (query_impl_info) {
+        construct_impl_info(component, &info->impl);
+    }
 
     return PSA_SUCCESS;
 }

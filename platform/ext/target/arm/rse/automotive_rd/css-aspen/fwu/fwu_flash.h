@@ -8,6 +8,10 @@
 #ifndef __FWU_FLASH_H_
 #define __FWU_FLASH_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "device_definition.h"
 #include "Driver_Flash.h"
 #include "fip_parser/uuid.h"
@@ -19,6 +23,9 @@
 
 #define FWU_STORE_INITIALIZED       (1U)
 #define FWU_STORE_UNINITIALIZED     (0U)
+
+/* Represents both PSA_FWU_WRITING and PSA_FWU_CANDIDATE states as combined state for Shim layer */
+#define PSA_FWU_WRITING_CANDIDATE   (8u)
 
 /**
  * Describes the location and identity of a firmware image in flash.
@@ -45,6 +52,8 @@ struct fwu_image_location {
 
 const struct fwu_image_location* fwu_get_image_location(psa_fwu_component_t component);
 
+psa_status_t fwu_flash_read(ARM_DRIVER_FLASH *flash, uint32_t partition_offset,
+                            void *data, uint32_t size);
 psa_status_t fwu_flash_write(ARM_DRIVER_FLASH *flash, uint32_t partition_offset,
                              const void *data, uint32_t size);
 psa_status_t fwu_flash_erase(ARM_DRIVER_FLASH *flash, uint32_t partition_offset,
@@ -68,5 +77,9 @@ psa_status_t fwu_flash_erase(ARM_DRIVER_FLASH *flash, uint32_t partition_offset,
                 return PSA_ERROR_GENERIC_ERROR;                                 \
             }                                                                   \
         } while (0)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __FWU_FLASH_H_ */
