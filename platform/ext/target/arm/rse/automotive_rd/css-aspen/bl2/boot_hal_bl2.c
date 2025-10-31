@@ -77,12 +77,12 @@ static int32_t fill_secure_flash_map_with_data(void)
     return 0;
 }
 
-#ifdef TFM_MEASURED_BOOT_API
+#if defined(TFM_MEASURED_BOOT_API) || defined(TFM_PARTITION_FIRMWARE_UPDATE)
 
-static int boot_add_data_to_shared_area(uint8_t        major_type,
-                                        uint16_t       minor_type,
-                                        size_t         size,
-                                        const uint8_t *data)
+int boot_add_data_to_shared_area(uint8_t major_type,
+                                 uint16_t minor_type,
+                                 size_t size,
+                                 const uint8_t *data)
 {
     struct shared_data_tlv_entry tlv_entry = {0};
     struct tfm_boot_data *boot_data;
@@ -145,6 +145,9 @@ static int boot_add_data_to_shared_area(uint8_t        major_type,
     return 0;
 }
 
+#endif /* TFM_MEASURED_BOOT_API || TFM_PARTITION_FIRMWARE_UPDATE */
+
+#ifdef TFM_MEASURED_BOOT_API
 /*
  * Store a boot measurement in shared memory.
  *

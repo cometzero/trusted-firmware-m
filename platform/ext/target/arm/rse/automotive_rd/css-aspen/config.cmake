@@ -46,6 +46,7 @@ set(NR_OF_FW_BANKS                      2        CACHE STRING  "Number of firmwa
 set(NR_OF_IMAGES_IN_FW_BANK             4        CACHE STRING  "Number of images per firmware bank")
 set(FWU_SUPPORT_TRIAL_STATE             ON       CACHE BOOL    "Device support TRIAL component state.")
 set(TFM_CONFIG_FWU_MAX_WRITE_SIZE       4096     CACHE STRING  "The maximum permitted size for block in psa_fwu_write, in bytes.")
+set(MCUBOOT_CUSTOM_DATA_SHARING_FUNCTION   ON    CACHE BOOL    "Enable platform-defined data sharing function between the bootloader and runtime firmware")
 
 # Once all cache options are set, set common options as fallback
 include(${CMAKE_CURRENT_LIST_DIR}/../../common/config.cmake)
