@@ -113,8 +113,6 @@ enum sfcp_error_t sfcp_convert_from_legacy(uint8_t *msg_buf, size_t input_msg_le
         return SFCP_ERROR_LEGACY_FORMAT_CONVERSION_NOT_REQUIRED;
     }
 
-    WARN("[SFCP] Received legacy message format!\n");
-
     if (output_msg_len < required_output_message_size) {
         return SFCP_ERROR_BUFFER_TOO_SMALL;
     }
