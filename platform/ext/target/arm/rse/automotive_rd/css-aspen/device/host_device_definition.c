@@ -147,6 +147,12 @@ struct atu_map si_atu_regions[SI_ATU_REGION_COUNT] = {
         .size = 0x100000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
+    [SI_ATU_REGION_IDX_AP_GIC] = {
+        .log_addr = 0xD0770000UL,
+        .phy_addr = 0x20000000ULL,
+        .size = 0x8000000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
+    },
     [SI_ATU_REGION_IDX_SHARED_SRAM] = {
         .log_addr = 0xE0030000UL,
         .phy_addr = 0x0ULL,
