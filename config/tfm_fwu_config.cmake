@@ -24,3 +24,8 @@ if (DEFINED MCUBOOT_UPGRADE_STRATEGY)
 else()
     set(FWU_SUPPORT_TRIAL_STATE OFF CACHE BOOL "Device support TRIAL component state.")
 endif()
+
+# Generate test images to support Firmware Update tests
+set(CONFIG_TFM_FWU_GEN_TEST_IMAGES        OFF         CACHE BOOL      "Generate test images for Firmware Update tests. Image versions are bumped in test images as new images.")
+set(CONFIG_TFM_FWU_INC_TEST_SEC_CNT       OFF         CACHE BOOL      "Increase the security counters in test images generated for Firmware Update tests.")
+set(CONFIG_TFM_FWU_TEST_IMAGE_PREFIX      "fwu_test"  CACHE STRING    "Prefix of test image filenames.")

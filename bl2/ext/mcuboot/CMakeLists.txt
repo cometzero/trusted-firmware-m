@@ -230,8 +230,12 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
         SOURCES tfm_s_signed.bin
     )
 
+    add_custom_target(signed_images
+        ALL
+            DEPENDS tfm_s_signed_bin
+    )
+
     set(wrapper_args
-        -v ${MCUBOOT_IMAGE_VERSION_S}
         --layout $<TARGET_OBJECTS:signing_layout_s>
         -k ${MCUBOOT_KEY_S}
         --public-key-format $<IF:$<BOOL:${MCUBOOT_HW_KEY}>,full,hash>
@@ -239,7 +243,6 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
         --pad
         --pad-header
         -H ${BL2_HEADER_SIZE}
-        -s ${MCUBOOT_SECURITY_COUNTER_S}
         -L ${MCUBOOT_ENC_KEY_LEN}
         -d \"\(1,${MCUBOOT_NS_IMAGE_MIN_VER}\)\"
         $<$<STREQUAL:${MCUBOOT_UPGRADE_STRATEGY},OVERWRITE_ONLY>:--overwrite-only>
@@ -247,7 +250,13 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
         $<$<BOOL:${MCUBOOT_ENC_IMAGES}>:-E${MCUBOOT_KEY_ENC}>
         $<$<BOOL:${MCUBOOT_MEASURED_BOOT}>:--measured-boot-record>
         $<TARGET_FILE_DIR:tfm_s>/tfm_s.bin
-        ${CMAKE_CURRENT_BINARY_DIR}/tfm_s_signed.bin
+    )
+
+    set(wrapper_depends
+        DEPENDS tfm_s_bin signing_layout_s
+        DEPENDS $<IF:$<BOOL:${MCUBOOT_GENERATE_SIGNING_KEYPAIR}>,generated_private_key,>
+        DEPENDS $<$<BOOL:${MCUBOOT_ENC_IMAGES}>:${MCUBOOT_KEY_ENC_NS}>
+        WORKING_DIRECTORY ${MCUBOOT_PATH}/scripts
     )
 
     if(MCUBOOT_BUILTIN_KEY)
@@ -265,15 +274,51 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
 
     add_custom_command(OUTPUT tfm_s_signed.bin
         OUTPUT ${bin_dir}/tfm_s_signed.bin
-        DEPENDS ${bin_dir}/tfm_s.bin tfm_s_bin signing_layout_s
-        DEPENDS $<IF:$<BOOL:${MCUBOOT_GENERATE_SIGNING_KEYPAIR}>,generated_private_key,>
-        DEPENDS $<$<BOOL:${MCUBOOT_ENC_IMAGES}>:${MCUBOOT_KEY_ENC_NS}>
-        WORKING_DIRECTORY ${MCUBOOT_PATH}/scripts
+        ${wrapper_depends}
 
         #Sign secure binary image with provided secret key
         COMMAND  mcuboot_imagesign_wrapper ${wrapper_args}
+                                           ${CMAKE_CURRENT_BINARY_DIR}/tfm_s_signed.bin
+                                           -v ${MCUBOOT_IMAGE_VERSION_S}
+                                           -s ${MCUBOOT_SECURITY_COUNTER_S}
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/tfm_s_signed.bin ${bin_dir}
     )
+
+    # Generate test image for Firmware Update (FWU) test purpose
+    if (CONFIG_TFM_FWU_GEN_TEST_IMAGES)
+        add_custom_target(${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_tfm_s_signed_bin
+            SOURCES ${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_tfm_s_signed.bin
+        )
+
+        add_dependencies(signed_images ${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_tfm_s_signed_bin)
+
+        # Bump the image version of the test image
+        string(REGEX MATCH "^([0-9]+)\\.([0-9]+)(\\.[0-9]+)?(\\+.*)?$" _
+               "${MCUBOOT_IMAGE_VERSION_S}")
+        math(EXPR _NEW_MINOR "${CMAKE_MATCH_2} + 1")
+        set(FAKE_NEW_IMAGE_VERSION
+            "${CMAKE_MATCH_1}.${_NEW_MINOR}${CMAKE_MATCH_3}${CMAKE_MATCH_4}")
+
+        if (CONFIG_TFM_FWU_INC_TEST_SEC_CNT)
+            # Increase the security counter of the test image
+            math(EXPR FAKE_SECURITY_COUNTER "${MCUBOOT_SECURITY_COUNTER_S} + 1")
+        else()
+            set(FAKE_SECURITY_COUNTER ${MCUBOOT_SECURITY_COUNTER_S})
+        endif()
+
+        add_custom_command(OUTPUT ${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_tfm_s_signed.bin
+            OUTPUT ${bin_dir}/${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_tfm_s_signed.bin
+            ${wrapper_depends}
+
+            #Sign secure binary image with provided secret key
+            COMMAND  mcuboot_imagesign_wrapper ${wrapper_args}
+                                               ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_tfm_s_signed.bin
+                                               -v ${FAKE_NEW_IMAGE_VERSION}
+                                               -s ${FAKE_SECURITY_COUNTER}
+            COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_tfm_s_signed.bin
+                                             ${bin_dir}
+        )
+    endif()
 
     set(IMAGE_TYPE "NS_IMAGE")
     set(FLASH_AREA_NUM ${MCUBOOT_NS_IMAGE_FLASH_AREA_NUM})
@@ -296,11 +341,6 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
     target_link_libraries(signing_layout_ns
         PRIVATE
             platform_bl2
-    )
-
-    add_custom_target(signed_images
-        ALL
-        DEPENDS tfm_s_signed_bin
     )
 
     add_convert_to_offset_hex_target(tfm_s_signed

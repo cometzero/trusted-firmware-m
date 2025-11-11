@@ -155,36 +155,82 @@ endforeach()
 
 get_target_property(bin_dir bl2 RUNTIME_OUTPUT_DIRECTORY)
 
-add_custom_target(bl2_signed_bin
-    ALL
-    SOURCES bl2_signed.bin
-    SOURCES ${bin_dir}/bl2_signed.bin
+set(bl2_signed_bin_src
+    bl2_signed.bin
+    ${bin_dir}/bl2_signed.bin
 )
 
-add_custom_command(OUTPUT bl2_signed.bin
-    OUTPUT ${bin_dir}/bl2_signed.bin
+set(signing_args
+    --bl2_image_config ${CMAKE_CURRENT_BINARY_DIR}/config/bl2_image_config.pickle
+    --bl2_bin ${bin_dir}/bl2.bin
+    --signer_0:sign_alg ${TFM_BL1_2_CM_SIGNING_ALG}
+    --signer_0:sign_key ${TFM_BL1_2_CM_SIGNING_KEY_PATH}
+    --signer_0:sign_hash_alg ${TFM_BL1_2_MEASUREMENT_HASH_ALG}
+    $<$<EQUAL:${TFM_BL1_2_SIGNER_AMOUNT},2>:--signer_1:sign_alg=${TFM_BL1_2_DM_SIGNING_ALG}>
+    $<$<EQUAL:${TFM_BL1_2_SIGNER_AMOUNT},2>:--signer_1:sign_key=${TFM_BL1_2_DM_SIGNING_KEY_PATH}>
+    $<$<EQUAL:${TFM_BL1_2_SIGNER_AMOUNT},2>:--signer_1:sign_hash_alg=${TFM_BL1_2_MEASUREMENT_HASH_ALG}>
+    $<$<BOOL:${TFM_BL1_2_IMAGE_ENCRYPTION}>:--encrypt_key=${TFM_BL2_ENCRYPTION_KEY_PATH}>
+    $<$<BOOL:${TFM_BL1_2_IMAGE_ENCRYPTION}>:--encrypt_alg=AES_CTR>
+    $<$<BOOL:${TFM_BL1_2_IMAGE_ENCRYPTION}>:--kdf_alg=$<IF:$<BOOL:${TFM_BL1_SOFTWARE_CRYPTO}>,hkdf,sp800-108_cmac>>
+)
+
+set(signing_depends
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/create_bl2_img.py
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/config/bl2_image_config.pickle
     DEPENDS $<$<BOOL:${TFM_GENERATE_BL1_2_CM_SIGNING_KEY}>:bl1_generated_cm_signing_key>
     DEPENDS $<$<AND:$<EQUAL:${TFM_BL1_2_SIGNER_AMOUNT},2>,$<BOOL:${TFM_GENERATE_BL1_2_DM_SIGNING_KEY}>>:bl1_generated_dm_signing_key>
-    DEPENDS ${bin_dir}/bl2.bin bl2_bin
+    DEPENDS bl2_bin
+)
+
+add_custom_command(OUTPUT bl2_signed.bin
+    OUTPUT ${bin_dir}/bl2_signed.bin
+    ${signing_depends}
+
     COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/modules
             ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/create_bl2_img.py
-                    --bl2_image_config ${CMAKE_CURRENT_BINARY_DIR}/config/bl2_image_config.pickle
-                    --bl2_bin ${bin_dir}/bl2.bin
-                    --image_output_file bl2_signed.bin
-                    --signer_0:sign_alg ${TFM_BL1_2_CM_SIGNING_ALG}
-                    --signer_0:sign_key ${TFM_BL1_2_CM_SIGNING_KEY_PATH}
-                    --signer_0:sign_hash_alg ${TFM_BL1_2_MEASUREMENT_HASH_ALG}
-                    $<$<EQUAL:${TFM_BL1_2_SIGNER_AMOUNT},2>:--signer_1:sign_alg=${TFM_BL1_2_DM_SIGNING_ALG}>
-                    $<$<EQUAL:${TFM_BL1_2_SIGNER_AMOUNT},2>:--signer_1:sign_key=${TFM_BL1_2_DM_SIGNING_KEY_PATH}>
-                    $<$<EQUAL:${TFM_BL1_2_SIGNER_AMOUNT},2>:--signer_1:sign_hash_alg=${TFM_BL1_2_MEASUREMENT_HASH_ALG}>
-                    --image_version ${TFM_BL1_IMAGE_VERSION_BL2}
-                    --image_security_counter ${TFM_BL1_IMAGE_SECURITY_COUNTER_BL2}
-                    $<$<BOOL:${TFM_BL1_2_IMAGE_ENCRYPTION}>:--encrypt_key=${TFM_BL2_ENCRYPTION_KEY_PATH}>
-                    $<$<BOOL:${TFM_BL1_2_IMAGE_ENCRYPTION}>:--encrypt_alg=AES_CTR>
-                    $<$<BOOL:${TFM_BL1_2_IMAGE_ENCRYPTION}>:--kdf_alg=$<IF:$<BOOL:${TFM_BL1_SOFTWARE_CRYPTO}>,hkdf,sp800-108_cmac>>
+                                  ${signing_args}
+                                  --image_output_file bl2_signed.bin
+                                  --image_version ${TFM_BL1_IMAGE_VERSION_BL2}
+                                  --image_security_counter ${TFM_BL1_IMAGE_SECURITY_COUNTER_BL2}
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/bl2_signed.bin ${bin_dir}
+)
+
+# Generate test image for Firmware Update (FWU) test purpose
+if (CONFIG_TFM_FWU_GEN_TEST_IMAGES)
+    list(APPEND bl2_signed_bin_src ${bin_dir}/${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_bl2_signed.bin)
+
+    # Bump the image version of the test image
+    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)(\\.[0-9]+)?(\\+.*)?$" _
+               "${TFM_BL1_IMAGE_VERSION_BL2}")
+    math(EXPR _NEW_MINOR "${CMAKE_MATCH_2} + 1")
+    set(FAKE_NEW_IMAGE_VERSION
+        "${CMAKE_MATCH_1}.${_NEW_MINOR}${CMAKE_MATCH_3}${CMAKE_MATCH_4}")
+
+    if (CONFIG_TFM_FWU_INC_TEST_SEC_CNT)
+        # Increase the security counter of the test image
+        math(EXPR FAKE_SECURITY_COUNTER "${TFM_BL1_IMAGE_SECURITY_COUNTER_BL2} + 1")
+    else()
+        set(FAKE_SECURITY_COUNTER ${TFM_BL1_IMAGE_SECURITY_COUNTER_BL2})
+    endif()
+
+    add_custom_command(OUTPUT ${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_bl2_signed.bin
+        OUTPUT ${bin_dir}/${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_bl2_signed.bin
+        ${signing_depends}
+
+        COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/modules
+                ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/create_bl2_img.py
+                                      ${signing_args}
+                                      --image_output_file ${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_bl2_signed.bin
+                                      --image_version ${FAKE_NEW_IMAGE_VERSION}
+                                      --image_security_counter ${FAKE_SECURITY_COUNTER}
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_TFM_FWU_TEST_IMAGE_PREFIX}_bl2_signed.bin
+                                         ${bin_dir}
+    )
+endif()
+
+add_custom_target(bl2_signed_bin
+    ALL
+        SOURCES ${bl2_signed_bin_src}
 )
 
 add_convert_to_offset_hex_target(bl2_signed
