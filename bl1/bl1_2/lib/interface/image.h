@@ -45,7 +45,7 @@ fih_ret bl1_image_copy_to_sram(uint32_t image_id, uint8_t *out);
  *
  * @return The active image index in fih_init type
  */
-fih_int bl1_2_select_image(void);
+uint32_t bl1_2_select_image(void);
 
 /**
  * @brief BL1_2 rolls back to the previous BL2 image
@@ -55,7 +55,7 @@ fih_int bl1_2_select_image(void);
  *
  * @return The image index in fih_init type
  */
-fih_int bl1_2_rollback_image(void);
+uint32_t bl1_2_rollback_image(void);
 
 #ifdef __cplusplus
 }
