@@ -14,14 +14,20 @@
 
 #include "mhu_v3_x.h"
 #include "rse_expansion_device_cfg.h"
+
+#ifdef PLATFORM_HAS_STRATA_FLASH
 #include "spi_strataflashj3_flash_lib.h"
+#endif /* PLATFORM_HAS_STRATA_FLASH */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#ifdef PLATFORM_HAS_STRATA_FLASH
 extern struct cfi_strataflashj3_dev_t SPI_STRATAFLASHJ3_DEV;
 extern struct cfi_strataflashj3_dev_t SPI_STRATAFLASHJ3_AP_DEV;
+#endif /* PLATFORM_HAS_STRATA_FLASH */
+
 extern struct mhu_v3_x_dev_t MHU_SI_CL0_SENDER_DEV_S;
 extern struct mhu_v3_x_dev_t MHU_SI_CL0_RECEIVER_DEV_S;
 

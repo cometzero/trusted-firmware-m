@@ -52,5 +52,11 @@ set(TFM_CONFIG_FWU_MAX_WRITE_SIZE       4096     CACHE STRING  "The maximum perm
 set(MCUBOOT_CUSTOM_DATA_SHARING_FUNCTION   ON    CACHE BOOL    "Enable platform-defined data sharing function between the bootloader and runtime firmware")
 set(FWU_DEVICE_IMPL_INFO_DEF_FILE       "${CMAKE_CURRENT_LIST_DIR}/fwu/tfm_fwu_impl_info.h"    CACHE STRING    "The platform specific header file defining psa_fwu_impl_info_t structure")
 
+if (TFM_PLATFORM_VARIANT STREQUAL "fvp")
+    set(PLATFORM_HAS_STRATA_FLASH      ON       CACHE BOOL    "Whether the platform has a Srata flash or a simple memory model flash")
+else()
+    set(PLATFORM_HAS_STRATA_FLASH      OFF      CACHE BOOL    "Whether the platform has a Srata flash or a simple memory model flash")
+endif()
+
 # Once all cache options are set, set common options as fallback
 include(${CMAKE_CURRENT_LIST_DIR}/../../common/config.cmake)

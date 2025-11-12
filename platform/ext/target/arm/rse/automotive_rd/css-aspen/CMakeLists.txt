@@ -8,6 +8,21 @@ set(CMAKE_CURRENT_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../common common)
 
+target_compile_definitions(platform_common_interface
+                           INTERFACE
+                               CSS_ASPEN_VARIANT_FVP=0
+                               CSS_ASPEN_VARIANT_RTL=1)
+
+if (TFM_PLATFORM_VARIANT STREQUAL "fvp")
+      target_compile_definitions(platform_common_interface
+                                 INTERFACE TFM_PLATFORM_VARIANT=0)
+elseif (TFM_PLATFORM_VARIANT STREQUAL "rtl")
+      target_compile_definitions(platform_common_interface
+                                 INTERFACE TFM_PLATFORM_VARIANT=1)
+else()
+      message(FATAL_ERROR "Please set TFM_PLATFORM_VARIANT\n")
+endif()
+
 #========================= Platform Region Defs ===============================#
 
 target_include_directories(platform_region_defs
@@ -19,22 +34,29 @@ target_include_directories(platform_region_defs
 
 target_sources(platform_bl1_1
     PRIVATE
-        cmsis_drivers/Driver_Flash.c
+        $<IF:$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>,
+            cmsis_drivers/Driver_Flash.c,
+            cmsis_drivers/Driver_Simple_Memory_Flash.c>
         device/rse_expansion_device_definition.c
         device/host_device_definition.c
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi/cfi_drv.c
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi/cfi_drv.c>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011/uart_pl011_drv.c>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${CMAKE_CURRENT_SOURCE_DIR}/cmsis_drivers/Driver_USART_pl011.c>
+)
+
+target_compile_definitions(platform_bl1_1
+    PRIVATE
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:PLATFORM_HAS_STRATA_FLASH>
 )
 
 target_include_directories(platform_bl1_1_interface
     INTERFACE
         cmsis_drivers
         device
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/common
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/common>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011>
 )
 
@@ -46,9 +68,9 @@ target_include_directories(platform_bl1_2
     PUBLIC
         cmsis_drivers
         device
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/common
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/common>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011>
 )
 
@@ -65,7 +87,9 @@ target_sources(platform_bl2
         bl2/boot_hal_bl2.c
         bl2/flash_map_bl2.c
         bl2/scmi_comms.c
-        cmsis_drivers/Driver_Flash.c
+        $<IF:$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>,
+            cmsis_drivers/Driver_Flash.c,
+            cmsis_drivers/Driver_Simple_Memory_Flash.c>
         device/host_device_definition.c
         device/rse_expansion_device_definition.c
         device/tfm_plat_boot_measurement.c
@@ -73,8 +97,8 @@ target_sources(platform_bl2
         $<$<BOOL:${PLATFORM_HOST_HAS_SI_CL}>:${CMAKE_CURRENT_SOURCE_DIR}/host_drivers/scr_drv.c>
         scmi/scmi_hal.c
         scmi/scmi_power_domain.c
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi/cfi_drv.c
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi/cfi_drv.c>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c>
         ${PLATFORM_DIR}/ext/target/arm/rse/common/fip_parser/fip_parser.c
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011/uart_pl011_drv.c>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${CMAKE_CURRENT_SOURCE_DIR}/cmsis_drivers/Driver_USART_pl011.c>
@@ -91,9 +115,9 @@ target_include_directories(platform_bl2
         device
         host_drivers
         scmi
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/common
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/common>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata>
         ${PLATFORM_DIR}/ext/target/arm/rse/common/fip_parser
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011>
 )
@@ -103,6 +127,7 @@ target_compile_definitions(platform_bl2
         $<$<BOOL:${PLATFORM_HOST_HAS_SI_CL}>:PLATFORM_HOST_HAS_SI_CL>
         $<$<BOOL:${PLATFORM_RSE_HAS_ATU_OWNERSHIP}>:PLATFORM_RSE_HAS_ATU_OWNERSHIP>
         SCMI_COMMS_FOR_BL2_POLLING_MODE
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:PLATFORM_HAS_STRATA_FLASH>
 )
 
 target_sources(bootutil
@@ -143,21 +168,23 @@ target_include_directories(platform_s
     PUBLIC
         cmsis_drivers
         device
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/common
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/common>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011>
 )
 
 target_sources(platform_s
     PRIVATE
-        cmsis_drivers/Driver_Flash.c
+        $<IF:$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>,
+            cmsis_drivers/Driver_Flash.c,
+            cmsis_drivers/Driver_Simple_Memory_Flash.c>
         device/host_device_definition.c
         device/rse_expansion_device_definition.c
         $<$<BOOL:${TFM_MULTI_CORE_TOPOLOGY}>:${CMAKE_CURRENT_SOURCE_DIR}/sfcp/sfcp_platform.c>
         $<$<BOOL:${TFM_MULTI_CORE_TOPOLOGY}>:${CMAKE_CURRENT_SOURCE_DIR}/sfcp/sfcp_permissions_hal.c>
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi/cfi_drv.c
-        ${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi/cfi_drv.c>
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011/uart_pl011_drv.c>
         $<$<BOOL:${RSE_USE_HOST_UART}>:${CMAKE_CURRENT_SOURCE_DIR}/cmsis_drivers/Driver_USART_pl011.c>
 )
@@ -167,6 +194,11 @@ target_compile_definitions(platform_s
         SCMI_COMMS_FOR_RUNTIME_IRQ_NOTIFICATIONS
         SFCP_ATU_REGION_SIZE=${SFCP_ATU_REGION_SIZE}
         $<$<BOOL:${PLATFORM_RSE_HAS_ATU_OWNERSHIP}>:PLATFORM_RSE_HAS_ATU_OWNERSHIP>
+)
+
+target_compile_definitions(platform_s
+    PRIVATE
+        $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:PLATFORM_HAS_STRATA_FLASH>
 )
 
 #========================= SCMI Hardware Abstraction Layer ====================#

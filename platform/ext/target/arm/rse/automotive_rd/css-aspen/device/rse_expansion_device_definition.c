@@ -14,6 +14,7 @@
 #include "platform_base_address.h"
 #include "host_si_memory_map.h"
 
+#ifdef PLATFORM_HAS_STRATA_FLASH
 static const struct cfi_dev_cfg_t CFI_DEV_CFG_S = {
     .base = BOOT_FLASH_BASE_S,
 };
@@ -46,6 +47,7 @@ struct cfi_strataflashj3_dev_t SPI_STRATAFLASHJ3_AP_DEV = {
     .program_unit = 1U,
     .is_initialized = false,
 };
+#endif /* PLATFORM_HAS_STRATA_FLASH */
 
 struct mhu_v3_x_dev_t MHU_SI_CL0_SENDER_DEV_S = {
     .version = 3,

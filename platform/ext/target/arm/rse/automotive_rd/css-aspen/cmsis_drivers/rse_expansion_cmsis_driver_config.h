@@ -14,8 +14,10 @@
 #define UART0_DEV                    UART0_PL011_DEV_NS
 #endif /* RSE_USE_HOST_UART */
 
+#ifdef PLATFORM_HAS_STRATA_FLASH
 #define FLASH0_DEV                   SPI_STRATAFLASHJ3_DEV
 
 #define FLASH1_DEV                   SPI_STRATAFLASHJ3_AP_DEV
+#endif /* PLATFORM_HAS_STRATA_FLASH */
 
 #endif  /* __RSE_EXPANSION_CMSIS_DRIVER_CONFIG_H__ */
