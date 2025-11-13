@@ -788,6 +788,14 @@ static int boot_platform_pre_load_si_cl0(void)
 
     clear_safety_island_memory(&HOST_SI_SCR_DEV);
 
+    /* In the Safety Island, the UARTs are not protected by any safety mechanism,
+     * as they are not safety relevant. To ensure there is no interference from the UARTs
+     * in the case of an error (e.g. a spurious interrupt to the GIC), the UART outputs are
+     * safely gated with the DEBUG_ALLOWED signal from the SCR.
+     * Enable DEBUG_ALLOWED signal to see UART messages.
+     */
+    scr->safectlr |= (1U << SI_SAFECTRL_DBG_ALLOWED_SHIFT);
+
     /* Close RSE ATU region configured to access SI System Control Registers */
     atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
     if (atu_err != ATU_ERR_NONE) {

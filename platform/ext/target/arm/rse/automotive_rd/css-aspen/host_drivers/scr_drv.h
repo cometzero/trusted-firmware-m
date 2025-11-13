@@ -21,6 +21,9 @@ extern "C" {
 #define MEMPROTCTLR_SH1_MEMPROTEN_BIT   4U
 #define MEMPROTCTLR_SH2_MEMPROTEN_BIT   5U
 
+/* SAFECTRL bit positions */
+#define SI_SAFECTRL_DBG_ALLOWED_SHIFT  0U
+
 typedef union system_cfg_type{
     struct{
         uint32_t cl1_present: 1;
