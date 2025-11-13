@@ -308,6 +308,16 @@ enum rse_atu_ids {
 #define HOST_SMDEXP2SMD_ATU_GPV_SIZE   ALIGN_UP(0x10000, RSE_ATU_PAGE_SIZE)
 #define HOST_SMDEXP2SMD_ATU_ID         RSE_ATU_SMDEXP2SMD_ATU_ID
 
+/* Systop PIK logical address start */
+#define HOST_SYSTOP_PIK_ATU_WINDOW_BASE_S (HOST_SMDEXP2SMD_ATU_BASE_S +   \
+                                           HOST_SMDEXP2SMD_ATU_GPV_SIZE)
+/* Systop PIK base address */
+#define HOST_SYSTOP_PIK_PHYS_BASE         0x20000D0200000ULL
+/* Systop PIK ATU size */
+#define HOST_SYSTOP_PIK_SIZE              ALIGN_UP(0x10000U, RSE_ATU_PAGE_SIZE)
+/* Systop PIK ATU region id */
+#define HOST_SYSTOP_PIK_ATU_ID            RSE_ATU_FW_INIT_ID
+
 /* ATU region mapping to access Protected Storage */
 #define HOST_ACCESS_PS_BASE_S      (HOST_ACCESS_BASE_NS + RSE_FLASH_IMG_SIZE)
 #define HOST_ACCESS_PS_BASE_OFFSET RSE_FLASH_IMG_SIZE

@@ -56,6 +56,10 @@ const struct ppu_dev_t HOST_SI_CL1_CLUS_PPU_DEV = {
 const struct scr_dev_t HOST_SI_SCR_DEV = {
     .scr_base = HOST_SI_SCR_ATU_WINDOW_BASE_S,
 };
+
+const struct systop_pik_dev_t HOST_SYSTOP_PIK_DEV = {
+    .pik_base = HOST_SYSTOP_PIK_ATU_WINDOW_BASE_S,
+};
 #endif /* PLATFORM_HOST_HAS_SI_CL */
 
 #ifdef PLATFORM_RSE_HAS_ATU_OWNERSHIP

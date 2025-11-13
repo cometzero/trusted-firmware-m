@@ -24,6 +24,7 @@
 #include "scmi_comms.h"
 #include "scmi_hal.h"
 #include "scmi_power_domain.h"
+#include "systop_pik.h"
 #include "tfm_boot_status.h"
 #include "tfm_plat_defs.h"
 
@@ -689,6 +690,7 @@ static int boot_platform_pre_load_si_cl0(void)
     enum ppu_error_t ppu_err;
     int error;
     volatile scr_t *scr = (volatile scr_t *)HOST_SI_SCR_DEV.scr_base;
+    volatile systop_pik_t *systop_pik = (volatile systop_pik_t *)HOST_SYSTOP_PIK_DEV.pik_base;
 
     BOOT_LOG_INF("BL2: SI CL0 pre load start");
 
@@ -795,6 +797,42 @@ static int boot_platform_pre_load_si_cl0(void)
     /* Close RSE ATU region configured to access SI Shared SRAM */
     atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_SI_SSRAM_ID);
     if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access Systop PIK */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SYSTOP_PIK_ATU_ID,
+                                        HOST_SYSTOP_PIK_ATU_WINDOW_BASE_S,
+                                        HOST_SYSTOP_PIK_PHYS_BASE,
+                                        HOST_SYSTOP_PIK_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for Systop PIK window", (int)atu_err);
+        return 1;
+    }
+
+    /*
+     * The Address Translation Units (ATUs) in the Safety Island Address
+     * Translation Block translate the addresses of read and write transactions
+     * originating from the Safety Island.
+     *
+     * The Address Translation Block forwards these translated transactions to
+     * the host subsystem through the PCMA and PCPA interfaces.
+     *
+     * In certain conditions, read and write requests or responses may not
+     * propagate correctly through the Address Translation Block. Ensuring the
+     * Safety Island clock remains enabled avoids this issue.
+     *
+     * This change sets the Safety Island clock force-set bit in the systop PIK
+     * to keep the clock ungated.
+     */
+    /* Configure RSE ATU to access Systop PIK */
+    systop_pik->clkforce_set |= (1U << SISYSCLK_FORCE_SET_SHIFT);
+
+    /* Close RSE ATU region configured to access Systop PIK */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SYSTOP_PIK_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for Systop PIK window", (int)atu_err);
         return 1;
     }
 
