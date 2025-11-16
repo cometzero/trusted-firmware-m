@@ -33,6 +33,12 @@ extern "C" {
 #define LAST_ATTEMPT_STATUS_ERROR_PWR_EVT_BATT              0x00000007
 #define LAST_ATTEMPT_STATUS_ERROR_UNSATISFIED_DEPENDENCIES  0x00000008
 
+/* Convert the image version into uint32_t type. */
+#define CONVERT_FWU_VERSION(major, minor, revision)    \
+                            ((uint32_t)((((uint32_t)(major) & 0xFF) << 24) | \
+                                        (((uint32_t)(minor) & 0xFF) << 16) | \
+                                        (revision & 0xFFFF)))
+
 /**
  * \brief                   Get the version of the active firmware image
  *                          identified by \p component.

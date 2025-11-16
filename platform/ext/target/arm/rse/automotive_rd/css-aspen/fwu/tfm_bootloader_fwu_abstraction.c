@@ -203,7 +203,6 @@ psa_status_t fwu_bootloader_mark_image_accepted(const psa_fwu_component_t *trial
     for (int idx = 0; idx < number; idx++) {
         fwu_mdata.fw_desc.img_entry[trials[idx]].img_props[active_index].accepted =
                 FWU_IMAGE_ACCEPTED;
-        private_mdata.esrt_entries[trials[idx]].last_attempt_status = LAST_ATTEMPT_STATUS_SUCCESS;
 
         /* lowest_supported_fw_version should be updated when the
          * security counter increases. For now we are relying on
@@ -226,6 +225,9 @@ psa_status_t fwu_bootloader_mark_image_accepted(const psa_fwu_component_t *trial
 psa_status_t fwu_bootloader_reject_staged_image(psa_fwu_component_t component)
 {
     psa_status_t status;
+
+    private_mdata.esrt_entries[component].last_attempt_status =
+                                        LAST_ATTEMPT_STATUS_ERROR_UNSUCCESSFUL;
 
     /* Set the component state to PSA_FWU_FAILED and rollback the boot_index
      * in private metadata
@@ -254,6 +256,9 @@ psa_status_t fwu_bootloader_reject_staged_image(psa_fwu_component_t component)
 psa_status_t fwu_bootloader_reject_trial_image(psa_fwu_component_t component)
 {
     psa_status_t status;
+
+    private_mdata.esrt_entries[component].last_attempt_status =
+                                        LAST_ATTEMPT_STATUS_ERROR_UNSUCCESSFUL;
 
     /* Set the component state to PSA_FWU_REJECTED and rollback the boot_index
      * in private metadata
@@ -286,16 +291,30 @@ psa_status_t fwu_bootloader_abort(psa_fwu_component_t component)
     return PSA_ERROR_NOT_SUPPORTED;
 }
 
-static void construct_impl_info(psa_fwu_component_t component,
-                                psa_fwu_impl_info_t *impl_info)
+static psa_status_t construct_impl_info(psa_fwu_component_t component,
+                                        psa_fwu_component_info_t *info)
 {
-    impl_info->lowest_supported_fw_version =
-            private_mdata.esrt_entries[component].lowest_supported_fw_version;
-    impl_info->last_attempt_version =
-                    private_mdata.esrt_entries[component].last_attempt_version;
-    impl_info->last_attempt_status =
-                    private_mdata.esrt_entries[component].last_attempt_status;
-    impl_info->fw_type = ESRT_FW_TYPE_SYSTEMFIRMWARE;
+    struct esrt_info_entry *entry = &private_mdata.esrt_entries[component];
+    psa_status_t status = PSA_ERROR_GENERIC_ERROR;
+
+    if (entry->lowest_supported_fw_version == 0) {
+        /* Set LowestSupportedFwVersion if it is not provisioned. */
+        entry->lowest_supported_fw_version = CONVERT_FWU_VERSION(info->version.major,
+                                                                 info->version.minor,
+                                                                 info->version.patch);
+
+        status = fwu_private_metadata_write(&private_mdata);
+        if (status != PSA_SUCCESS) {
+            return status;
+        }
+    }
+
+    info->impl.lowest_supported_fw_version = entry->lowest_supported_fw_version;
+    info->impl.last_attempt_version = entry->last_attempt_version;
+    info->impl.last_attempt_status = entry->last_attempt_status;
+    info->impl.fw_type = ESRT_FW_TYPE_SYSTEMFIRMWARE;
+
+    return PSA_SUCCESS;
 }
 
 psa_status_t fwu_bootloader_get_image_info(psa_fwu_component_t component, bool query_state,
@@ -325,10 +344,10 @@ psa_status_t fwu_bootloader_get_image_info(psa_fwu_component_t component, bool q
     info->version = fwu_version;
 
     if (query_impl_info) {
-        construct_impl_info(component, &info->impl);
+        status = construct_impl_info(component, info);
     }
 
-    return PSA_SUCCESS;
+    return status;
 }
 
 psa_status_t fwu_bootloader_clean_component(psa_fwu_component_t component)

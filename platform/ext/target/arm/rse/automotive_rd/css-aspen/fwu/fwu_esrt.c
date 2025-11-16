@@ -24,12 +24,6 @@
                                 (sizeof(struct image_version) + \
                                  SHARED_DATA_ENTRY_HEADER_SIZE))
 
-/* Convert the image version into uint32_t type. */
-#define CONVERT_FWU_VERSION(major, minor, revision)    \
-                            ((uint32_t)((((uint32_t)(major) & 0xFF) << 24) | \
-                                        (((uint32_t)(minor) & 0xFF) << 16) | \
-                                        (revision & 0xFFFF)))
-
 /* Contains the received boot status information from bootloader */
 typedef struct fwu_image_info_data_s {
     struct shared_data_tlv_header header;
@@ -285,8 +279,7 @@ psa_status_t esrt_update_last_attempt(struct fwu_private_metadata *mdata,
         return PSA_ERROR_GENERIC_ERROR;
     }
 
-    mdata->esrt_entries[component].last_attempt_status =
-                                        LAST_ATTEMPT_STATUS_ERROR_UNSUCCESSFUL;
+    mdata->esrt_entries[component].last_attempt_status = LAST_ATTEMPT_STATUS_SUCCESS;
 
     return PSA_SUCCESS;
 }
