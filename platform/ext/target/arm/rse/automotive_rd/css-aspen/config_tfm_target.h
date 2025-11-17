@@ -42,10 +42,10 @@
 #define ITS_NUM_ASSETS 20
 
 /* The maximum asset size to be stored in the Protected Storage */
-#define PS_MAX_ASSET_SIZE 4096
+#define PS_MAX_ASSET_SIZE                      6144
 
 /* The maximum number of assets to be stored in the Protected Storage area. */
-#define PS_NUM_ASSETS 20
+#define PS_NUM_ASSETS                          30
 
 /* This is needed to be able to process the EFI variables during PS writes. */
 #undef CRYPTO_ENGINE_BUF_SIZE

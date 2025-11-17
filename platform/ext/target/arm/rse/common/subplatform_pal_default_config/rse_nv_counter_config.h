@@ -18,7 +18,7 @@
  * PS NV counters are longer to support more writes.
  * Each PS NV counter occupies multiple NV counter slots.
  */
-#define RSE_NV_COUNTER_PS_LENGTH_MULTIPLIER    2
+#define RSE_NV_COUNTER_PS_LENGTH_MULTIPLIER    3
 #else
 #define RSE_NV_COUNTER_PS_AMOUNT 0
 #define RSE_NV_COUNTER_PS_LENGTH_MULTIPLIER    1

@@ -33,15 +33,15 @@
 /*
  * ┌─────────────────────┬──────────────────────┬──────────────────────────┐
  * │    Signed Images    │  Protected Storage   │ Internal Trusted Storage │
- * │     (48MB)          │       (64KB)         │           (1MB)          │
+ * │     (48MB)          │       (1MB)          │           (256KB)        │
  * └─────────────────────┴──────────────────────┴──────────────────────────┘
  */
 /* This part is for signed images. 48MB */
 #define RSE_FLASH_IMG_SIZE          0x3000000UL
-/* This part is for Protected Storage. 64KB */
-#define RSE_FLASH_PS_SIZE           0x10000UL
-/* This part is for Internal Trusted Storage. 1MB */
-#define RSE_FLASH_ITS_SIZE          0x100000UL
+/* This part is for Protected Storage. 1MB */
+#define RSE_FLASH_PS_SIZE           0x100000UL
+/* This part is for Internal Trusted Storage. 256KB */
+#define RSE_FLASH_ITS_SIZE          0x40000UL
 
 #include "rse_memory_sizes_common.h"
 
