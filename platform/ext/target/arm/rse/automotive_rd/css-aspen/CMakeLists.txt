@@ -105,6 +105,33 @@ target_compile_definitions(platform_bl2
         SCMI_COMMS_FOR_BL2_POLLING_MODE
 )
 
+#========================= Aspen runtime image loader =========================#
+
+add_library(runtime_image_loader STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/bootloader/rse_image_loader/src/rse_image_load_util.c
+    ${CMAKE_SOURCE_DIR}/bl2/src/flash_map.c
+    $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu/fwu_hal_bl2.c>
+    $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu/fwu_private_metadata.c>
+)
+
+target_include_directories(runtime_image_loader
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/fwu
+        $<TARGET_PROPERTY:bootutil,INCLUDE_DIRECTORIES>
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/bootloader/rse_image_loader/include
+)
+
+target_link_libraries(runtime_image_loader
+    PRIVATE
+        bl2_crypto
+)
+
+target_compile_definitions(runtime_image_loader
+    PRIVATE
+        $<$<BOOL:${PLATFORM_RSE_HAS_ATU_OWNERSHIP}>:PLATFORM_RSE_HAS_ATU_OWNERSHIP>
+)
+
 #========================= Platform Secure ====================================#
 
 target_include_directories(platform_s
@@ -134,6 +161,7 @@ target_compile_definitions(platform_s
     PUBLIC
         SCMI_COMMS_FOR_RUNTIME_IRQ_NOTIFICATIONS
         SFCP_ATU_REGION_SIZE=${SFCP_ATU_REGION_SIZE}
+        $<$<BOOL:${PLATFORM_RSE_HAS_ATU_OWNERSHIP}>:PLATFORM_RSE_HAS_ATU_OWNERSHIP>
 )
 
 #========================= SCMI Hardware Abstraction Layer ====================#
@@ -148,4 +176,9 @@ target_include_directories(scmi_hal
 target_sources(scmi_hal
     INTERFACE
         scmi/scmi_hal.c
+)
+
+target_link_libraries(scmi_hal
+    INTERFACE
+        runtime_image_loader
 )

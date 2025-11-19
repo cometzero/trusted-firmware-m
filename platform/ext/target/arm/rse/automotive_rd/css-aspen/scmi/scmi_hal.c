@@ -14,6 +14,7 @@
 #include "config_tfm_target.h"
 #include "device_definition.h"
 #include "mhu_v3_x.h"
+#include "rse_image_load_util.h"
 #include "tfm_hal_spm_logdev.h"
 #include "tfm_hal_device_header.h"
 #include "tfm_hal_platform.h"
@@ -295,9 +296,12 @@ int32_t scmi_hal_sys_power_state(uint32_t agent_id, uint32_t flags,
         }
         break;
     case SCMI_SYS_POWER_STATE_COLD_RESET:
-    case SCMI_SYS_POWER_STATE_WARM_RESET:
         SCMI_LOG_NOT("Resetting system");
         tfm_hal_system_reset(TFM_PLAT_SWSYN_DEFAULT);
+        break;  
+    case SCMI_SYS_POWER_STATE_WARM_RESET:
+        rse_load_ap_bl2_image();
+        SCMI_LOG_NOT("Resetting system (warm) finished");
         break;
     case SCMI_SYS_POWER_STATE_POWER_UP:
     default:
