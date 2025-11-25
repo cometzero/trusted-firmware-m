@@ -43,7 +43,7 @@ set(TFM_PARTITION_FIRMWARE_UPDATE       ON       CACHE BOOL    "Enable firmware 
 set(TFM_FWU_BOOTLOADER_LIB              "${CMAKE_SOURCE_DIR}/platform/ext/target/arm/rse/automotive_rd/css-aspen/fwu"   CACHE STRING    "Bootloader configure file for Firmware Update partition")
 set(FWU_DEVICE_CONFIG_FILE              "${CMAKE_BINARY_DIR}/generated/interface/include/psa/fwu_config.h"              CACHE STRING    "The device configuration file for Firmware Update partition")
 set(NR_OF_FW_BANKS                      2        CACHE STRING  "Number of firmware banks")
-set(NR_OF_IMAGES_IN_FW_BANK             4        CACHE STRING  "Number of images per firmware bank")
+set(NR_OF_IMAGES_IN_FW_BANK             5        CACHE STRING  "Number of images per firmware bank")
 set(FWU_SUPPORT_TRIAL_STATE             ON       CACHE BOOL    "Device support TRIAL component state.")
 set(TFM_CONFIG_FWU_MAX_WRITE_SIZE       4096     CACHE STRING  "The maximum permitted size for block in psa_fwu_write, in bytes.")
 set(MCUBOOT_CUSTOM_DATA_SHARING_FUNCTION   ON    CACHE BOOL    "Enable platform-defined data sharing function between the bootloader and runtime firmware")

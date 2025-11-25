@@ -41,6 +41,7 @@ extern "C" {
 #define FWU_COMPONENT_INDEX_RSE_RUNTIME     1U
 #define FWU_COMPONENT_INDEX_SI_CL0          2U
 #define FWU_COMPONENT_INDEX_AP_FIP_IMAGE    3U
+#define FWU_COMPONENT_INDEX_SI_CL1          4U
 
 #ifdef __cplusplus
 }

@@ -53,6 +53,12 @@ static const struct fwu_image_location bank_info[] = {
         .component = (psa_fwu_component_t)FWU_COMPONENT_INDEX_AP_FIP_IMAGE,
         .flash = &AP_FLASH_DEV_NAME,
     },
+    {
+        .partition_size = FLASH_SI_CL1_PARTITION_SIZE,
+        .partition_offset = {FLASH_AREA_6_OFFSET, FLASH_AREA_7_OFFSET},
+        .component = (psa_fwu_component_t)FWU_COMPONENT_INDEX_SI_CL1,
+        .flash = &FLASH_DEV_NAME,
+    },
 };
 
 const struct fwu_image_location* fwu_get_image_location(psa_fwu_component_t component)

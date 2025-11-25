@@ -42,7 +42,7 @@
 #define ITS_NUM_ASSETS 20
 
 /* The maximum asset size to be stored in the Protected Storage */
-#define PS_MAX_ASSET_SIZE 3456
+#define PS_MAX_ASSET_SIZE 4096
 
 /* The maximum number of assets to be stored in the Protected Storage area. */
 #define PS_NUM_ASSETS 20
@@ -51,9 +51,18 @@
 #undef CRYPTO_ENGINE_BUF_SIZE
 #define CRYPTO_ENGINE_BUF_SIZE                 0x5000
 
-/* This is also has to be increased to fit the EFI variables into the iovecs. */
+/*
+ * This is also has to be increased to fit the EFI variables into the iovecs.
+ * The iovec region shall be large enough to support AEAD encryption of EFI
+ * variables in PS.
+ * iovecs buffer size = PS_MAX_ASSET_SIZE (EFI variable plain data in invec[1]) +
+ *                      PS_MAX_ASSET_SIZE (Encrypted EFI variable in outvec[0]) +
+ *                      ~52 bytes (struct tfm_crypto_pack_iovec in invec[0]) +
+ *                      8 bytes (additional data in invec[2]) +
+ *                      20 bytes (padding for 16 bytes alignment)
+ */
 #undef CRYPTO_IOVEC_BUFFER_SIZE
-#define CRYPTO_IOVEC_BUFFER_SIZE               7128
+#define CRYPTO_IOVEC_BUFFER_SIZE               ((PS_MAX_ASSET_SIZE * 2) + 80)
 
 /* Default RSE SYSCLK/CPU0CLK value in Hz */
 #define SYSCLK         100000000UL /* 100 MHz */

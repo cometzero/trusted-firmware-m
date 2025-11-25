@@ -117,6 +117,10 @@ psa_status_t esrt_get_active_image_version(struct fwu_private_metadata *mdata,
         image_id = RSE_FIRMWARE_AP_BL2_ID;
         break;
 
+    case FWU_COMPONENT_INDEX_SI_CL1:
+        image_id = RSE_FIRMWARE_SI_CL1_ID;
+        break;
+
     default:
         return PSA_ERROR_INVALID_ARGUMENT;
     }
@@ -256,6 +260,7 @@ psa_status_t esrt_update_last_attempt(struct fwu_private_metadata *mdata,
 
     case FWU_COMPONENT_INDEX_RSE_RUNTIME:
     case FWU_COMPONENT_INDEX_SI_CL0:
+    case FWU_COMPONENT_INDEX_SI_CL1:
         status = get_update_image_version(mdata, component, &version);
         break;
 

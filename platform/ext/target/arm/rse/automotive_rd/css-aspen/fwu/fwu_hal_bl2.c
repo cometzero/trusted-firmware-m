@@ -28,6 +28,8 @@ int32_t fwu_hal_bl2_update_state_and_flashmap(void)
     uint32_t secure_image_size;
     uint32_t scp_image_offset;
     uint32_t scp_image_size;
+    uint32_t si_cl1_image_offset;
+    uint32_t si_cl1_image_size;
     bool transition = false;
 
     if (fwu_private_metadata_read(&private_metadata) != PSA_SUCCESS) {
@@ -52,21 +54,25 @@ int32_t fwu_hal_bl2_update_state_and_flashmap(void)
     }
 
     if (private_metadata.boot_index == FWU_BANK_0) {
-        /* For TF-M Runtime and SCP Firmware, set flash_map[] both
+        /* For TF-M Runtime and Safety Island images, set flash_map[] both
          * slot offsets to Primary Slot offset
          */
         secure_image_offset = FLASH_AREA_2_OFFSET;
         secure_image_size = FLASH_AREA_2_SIZE;
         scp_image_offset = FLASH_AREA_4_OFFSET;
         scp_image_size = FLASH_AREA_4_SIZE;
+        si_cl1_image_offset = FLASH_AREA_6_OFFSET;
+        si_cl1_image_size = FLASH_AREA_6_SIZE;
     } else {
-        /* For TF-M Runtime and SCP Firmware, set flash_map[]
+        /* For TF-M Runtime and Safety Island images, set flash_map[]
          * both slot offsets to Secondary Slot offset
          */
         secure_image_offset = FLASH_AREA_3_OFFSET;
         secure_image_size = FLASH_AREA_3_SIZE;
         scp_image_offset = FLASH_AREA_5_OFFSET;
         scp_image_size = FLASH_AREA_5_SIZE;
+        si_cl1_image_offset = FLASH_AREA_7_OFFSET;
+        si_cl1_image_size = FLASH_AREA_7_SIZE;
     }
 
     /*
@@ -86,6 +92,11 @@ int32_t fwu_hal_bl2_update_state_and_flashmap(void)
             case FLASH_AREA_IMAGE_SECONDARY(RSE_FIRMWARE_SI_CL0_ID):
                 flash_map[idx].fa_off = scp_image_offset;
                 flash_map[idx].fa_size = scp_image_size;
+                break;
+            case FLASH_AREA_IMAGE_PRIMARY(RSE_FIRMWARE_SI_CL1_ID):
+            case FLASH_AREA_IMAGE_SECONDARY(RSE_FIRMWARE_SI_CL1_ID):
+                flash_map[idx].fa_off = si_cl1_image_offset;
+                flash_map[idx].fa_size =si_cl1_image_size;
                 break;
         }
     }
