@@ -111,6 +111,42 @@ struct atu_map si_atu_regions[SI_ATU_REGION_COUNT] = {
         .size = 0x30000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
+    [SI_ATU_REGION_IDX_NI710AE_CLUSTER0_FMU] = {
+        .log_addr = 0xD0070000UL,
+        .phy_addr = 0x20000D2000000ULL,
+        .size = 0x100000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_CLUSTER1_FMU] = {
+        .log_addr = 0xD0170000UL,
+        .phy_addr = 0x20000D2100000ULL,
+        .size = 0x100000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_CLUSTER2_FMU] = {
+        .log_addr = 0xD0270000UL,
+        .phy_addr = 0x20000D2200000ULL,
+        .size = 0x100000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_CLUSTER3_FMU] = {
+        .log_addr = 0xD0370000UL,
+        .phy_addr = 0x20000D2300000ULL,
+        .size = 0x100000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_SYS_CTRL] = {
+        .log_addr = 0xD0470000UL,
+        .phy_addr = 0x20000D2400000ULL,
+        .size = 0x100000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
+    },
+    [SI_ATU_REGION_IDX_NI710AE_SMD] = {
+        .log_addr = 0xD0670000UL,
+        .phy_addr = 0x20000D2600000ULL,
+        .size = 0x100000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
+    },
     [SI_ATU_REGION_IDX_SHARED_SRAM] = {
         .log_addr = 0xE0030000UL,
         .phy_addr = 0x0ULL,
