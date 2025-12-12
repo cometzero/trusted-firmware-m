@@ -37,6 +37,9 @@ extern "C" {
 #define SCP_SHARED_MEMORY_SIZE SI_SHARED_MEMORY_SIZE
 #endif /* SCMI_COMMS_FOR_RUNTIME_IRQ_NOTIFICATIONS */
 
+#define SI_MHU_WARM_ACK_PBX_FLAG (1UL << 3U)
+#define SI_MHU_WARM_ACK_MBX_FLAG (1UL << 3U)
+
 #ifdef __cplusplus
 }
 #endif

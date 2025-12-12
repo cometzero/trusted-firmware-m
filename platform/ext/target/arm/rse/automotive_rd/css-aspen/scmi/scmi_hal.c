@@ -180,7 +180,7 @@ scmi_comms_err_t scmi_hal_doorbell_clear(void)
     enum mhu_v3_x_error_t err;
     uint32_t ch_val = 0;
 #ifdef SCMI_COMMS_FOR_RUNTIME_IRQ_NOTIFICATIONS
-    uint32_t valid_signals = (SI_MHU_COMMAND_MBX_FLAG | SI_MHU_NOTIFIER_MBX_FLAG);
+    uint32_t valid_signals = (SI_MHU_COMMAND_MBX_FLAG | SI_MHU_NOTIFIER_MBX_FLAG | SI_MHU_WARM_ACK_MBX_FLAG);
 #else
     uint32_t valid_signals = (SI_MHU_COMMAND_MBX_FLAG);
 #endif
@@ -236,6 +236,29 @@ void scmi_hal_wait(uint32_t cycles)
 #endif /* SCMI_COMMS_FOR_BL2_POLLING_MODE */
 
 #ifdef SCMI_COMMS_FOR_RUNTIME_IRQ_NOTIFICATIONS
+
+/*
+ * Notify SCP (SI_CL0) that AP BL2 image reloading has completed.
+ * This writes a small token into the NOTIFIER SRAM page and rings the
+ * corresponding MHU doorbell bit so SCP transport can see it.
+ */
+static scmi_comms_err_t scmi_hal_notify_warm_reset_ready(void)
+{
+    enum mhu_v3_x_error_t err;
+
+    SCMI_LOG_INF("Warm reset notify: signalling doorbell to SCP");
+
+    err = mhu_v3_x_doorbell_write(&MHU_RSE_TO_SI_CL0_DEV,
+                                  SI_MHU_DOORBELL_CHANNEL,
+                                  SI_MHU_WARM_ACK_PBX_FLAG);
+    if (err != MHU_V_3_X_ERR_NONE) {
+        SCMI_LOG_ERR("Warm reset notify: doorbell write failed: %d", (int)err);
+        return SCMI_COMMS_HARDWARE_ERROR;
+    }
+
+    return SCMI_COMMS_SUCCESS;
+}
+
 scmi_comms_err_t scmi_hal_shared_memory_read(uint32_t db_flag_bit, struct scmi_message_t *msg)
 {
     if (msg == NULL) {
@@ -301,7 +324,14 @@ int32_t scmi_hal_sys_power_state(uint32_t agent_id, uint32_t flags,
         break;  
     case SCMI_SYS_POWER_STATE_WARM_RESET:
         rse_load_ap_bl2_image();
-        SCMI_LOG_NOT("Resetting system (warm) finished");
+        scmi_hal_shared_memory_init();
+        /* Inform SCP(SI CL0) that the warm-reset image load has completed */
+        if (scmi_hal_notify_warm_reset_ready() != SCMI_COMMS_SUCCESS) {
+            SCMI_LOG_ERR("Warm reset notify: failed to signal SCP");
+        }
+        else {
+            SCMI_LOG_NOT("Resetting system (warm) finished");
+        }
         break;
     case SCMI_SYS_POWER_STATE_POWER_UP:
     default:
