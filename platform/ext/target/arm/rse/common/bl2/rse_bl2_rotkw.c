@@ -1,3 +1,11 @@
+/*
+ * SPDX-FileCopyrightText: Copyright The TrustedFirmware-M Contributors
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ */
+
+#include "cmsis_compiler.h"
 #include "tfm_plat_otp.h"
 #include "platform_otp_ids.h"
 #include <bootutil/sign_key.h>
@@ -5,8 +13,7 @@
 #include "rse_kmu_slot_ids.h"
 #include "cc3xx_opaque_keys.h"
 
-
-uint32_t get_enc_key_id_for_image(uint32_t image_id)
+__WEAK uint32_t get_enc_key_id_for_image(uint32_t image_id)
 {
     uint32_t res;
 

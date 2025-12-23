@@ -105,6 +105,11 @@ target_compile_definitions(platform_bl2
         SCMI_COMMS_FOR_BL2_POLLING_MODE
 )
 
+target_sources(bootutil
+    PRIVATE
+        bl2/rse_bl2_rotkw.c
+)
+
 #========================= Aspen runtime image loader =========================#
 
 add_library(runtime_image_loader STATIC
