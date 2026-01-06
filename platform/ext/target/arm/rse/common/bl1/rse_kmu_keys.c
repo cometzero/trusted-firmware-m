@@ -419,12 +419,6 @@ enum tfm_plat_err_t rse_setup_iak_seed(uint32_t *huk_buf, size_t huk_size)
         return plat_err;
     }
 
-    /* TODO: Should be removed once setup_key properly locks KMU slots */
-    kmu_err = kmu_set_key_locked(&KMU_DEV_S, RSE_KMU_SLOT_IAK_SEED);
-    if (kmu_err != KMU_ERROR_NONE) {
-        return (enum tfm_plat_err_t) kmu_err;
-    }
-
     return TFM_PLAT_ERR_SUCCESS;
 }
 
