@@ -31,6 +31,8 @@
 #define SCMI_BUSY_WAIT_CYCLES       10000000
 #define MAX_RETRIES_PROTOCOL_VER    3
 
+#define LBIST_WAIT_CYCLES           12500000
+
 extern struct flash_area flash_map[];
 extern const int flash_map_entry_num;
 extern ARM_DRIVER_FLASH AP_FLASH_DEV_NAME;
@@ -500,11 +502,47 @@ static int boot_platform_post_load_ap_bl2(void)
     return 0;
 }
 
+static void delay_cycles(uint32_t cycles)
+{
+    while (cycles--) {
+        __asm__("nop");
+    }
+}
+
+static int trigger_lbist_si(void)
+{
+    enum ppu_error_t ppu_err;
+
+    /* Configure SYSTOP dommain PPU of SI to FULL-RET to isolate TD-SYS */
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_SYSTOP_PPU_DEV,
+                                       PPU_PWR_POLICY_FULL_RET);
+    if (ppu_err != PPU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: SI TD_SYS domain Isolation failed: %d",
+                     (int)ppu_err);
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: SI LBIST happens here");
+
+    /* Mimic the LBIST execution with a delay. */
+    delay_cycles(LBIST_WAIT_CYCLES);
+
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_SYSTOP_PPU_DEV,
+                                       PPU_PWR_POLICY_OFF);
+    if (ppu_err != PPU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: Turning off SI SYSTOP PPU failed: %d", (int)ppu_err);
+        return 1;
+    }
+
+    return 0;
+}
+
 /* Enable SI PIK is powered on */
 static int boot_platform_si_pre_load(void)
 {
     enum atu_error_t atu_err;
     enum ppu_error_t ppu_err;
+    int error;
 
     /* Configure RSE ATU to access SI PIK */
     atu_err = atu_rse_initialize_region(&ATU_DEV_S,
@@ -514,6 +552,13 @@ static int boot_platform_si_pre_load(void)
                                         HOST_SI_PIK_SIZE);
     if (atu_err != ATU_ERR_NONE) {
         BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI PIK window", (int)atu_err);
+        return 1;
+    }
+
+    /* Trigger LBIST for Safety Island*/
+    error = trigger_lbist_si();
+    if(error != 0) {
+        BOOT_LOG_ERR("BL2: SI LBIST failed");
         return 1;
     }
 
