@@ -133,8 +133,8 @@ static inline void __set_persistent_data_flag(uint32_t bitfield_pos, uint32_t bi
 #ifdef RSE_PERSISTENT_DATA_FLAG_REG_ADDR
 #define RSE_GET_PERSISTENT_DATA_INITIALIZED_FLAG()                          \
     ((*RSE_PERSISTENT_DATA_FLAG_BASE >>                                     \
-      RSE_PERSISTENT_DATA_FLAGS_PERSISTENT_DATA_INITIALIZED_BITFIELD_POS) & \
-     0b1)
+      29) & \
+     0b11)
 
 #define RSE_SET_PERSISTENT_DATA_INITIALISED_FLAG(_val) \
     RSE_SET_PERSISTENT_DATA_FLAG(RSE_PERSISTENT_DATA_FLAGS_PERSISTENT_DATA_INITIALIZED, _val)
@@ -142,8 +142,8 @@ static inline void __set_persistent_data_flag(uint32_t bitfield_pos, uint32_t bi
 #else
 #define RSE_GET_PERSISTENT_DATA_INITIALIZED_FLAG()                            \
     ((((struct rse_sysctrl_t *)RSE_SYSCTRL_BASE_S)->reset_syndrome >>         \
-      (RSE_PERSISTENT_DATA_FLAGS_PERSISTENT_DATA_INITIALIZED_BITFIELD_POS)) & \
-     0b1)
+      (29)) & \
+     0b11)
 
 /* Flag is set in tfm_hal_system_reset when we come to reset the system */
 #define RSE_SET_PERSISTENT_DATA_INITIALISED_FLAG(_val) \

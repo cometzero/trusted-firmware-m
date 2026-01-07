@@ -25,7 +25,7 @@ __NO_RETURN void tfm_hal_system_reset(uint32_t sw_reset_syn_value)
 
 #ifndef RSE_PERSISTENT_DATA_FLAG_REG_ADDR
     sw_reset_syn_value |=
-        (0b1 << RSE_PERSISTENT_DATA_FLAGS_PERSISTENT_DATA_INITIALIZED_BITFIELD_POS);
+        (0b11 << 29);
 #else
     /* Persistent data should be initialised before the first reset */
     assert(RSE_GET_PERSISTENT_DATA_INITIALIZED_FLAG());
