@@ -828,20 +828,20 @@ static bool check_si_cl1_is_present(void)
     bool present = false;
 
     atu_err = atu_rse_initialize_region(&ATU_DEV_S,
-                                        HOST_SI_SID_ATU_ID,
-                                        HOST_SI_SID_ATU_WINDOW_BASE_S,
-                                        HOST_SI_SID_PHYS_BASE,
-                                        HOST_SI_SID_SIZE);
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
     if (atu_err != ATU_ERR_NONE) {
         BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI SID window", (int)atu_err);
         return false;
     }
 
-    present = sid_is_cl1_present(&HOST_SI_SID_DEV);
+    present = scr_sid_is_cl1_present(&HOST_SI_SCR_DEV);
 
-    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SID_ATU_ID);
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
     if (atu_err != ATU_ERR_NONE) {
-        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SID window", (int)atu_err);
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SCR window", (int)atu_err);
         return false;
     }
 
