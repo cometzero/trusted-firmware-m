@@ -45,6 +45,9 @@ int32_t fwu_hal_bl2_update_state_and_flashmap(void)
              */
             private_metadata.fwu_image_state[component] = PSA_FWU_TRIAL;
             transition = true;
+        } else if (private_metadata.fwu_image_state[component] == PSA_FWU_UPDATED) {
+            private_metadata.fwu_image_state[component] = PSA_FWU_READY;
+            transition = true;
         }
     }
 

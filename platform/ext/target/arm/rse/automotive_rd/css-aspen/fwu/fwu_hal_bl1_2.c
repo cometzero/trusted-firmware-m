@@ -19,18 +19,26 @@ uint32_t bl1_2_select_image(void)
 {
     struct fwu_private_metadata private_metadata = {0};
     psa_status_t status;
+    bool is_transition = false;
 
     status = fwu_private_metadata_read(&private_metadata);
     if (status != PSA_SUCCESS) {
         FIH_PANIC;
     }
 
-    /*
-     * Transition TF-M BL2 to PSA_FWU_TRIAL
-     * only if the current state is PSA_FWU_STAGED
-     */
     if (private_metadata.fwu_image_state[FWU_COMPONENT_INDEX_BL2] == PSA_FWU_STAGED) {
+        /*
+         * Transition TF-M BL2 to PSA_FWU_TRIAL
+         * only if the current state is PSA_FWU_STAGED
+         */
         private_metadata.fwu_image_state[FWU_COMPONENT_INDEX_BL2] = PSA_FWU_TRIAL;
+        is_transition = true;
+    } else if (private_metadata.fwu_image_state[FWU_COMPONENT_INDEX_BL2] == PSA_FWU_UPDATED) {
+        private_metadata.fwu_image_state[FWU_COMPONENT_INDEX_BL2] = PSA_FWU_READY;
+        is_transition = true;
+    }
+
+    if (is_transition) {
         status = fwu_private_metadata_write(&private_metadata);
         if (status != PSA_SUCCESS) {
             FIH_PANIC;
