@@ -23,6 +23,15 @@ enum ppu_error_t {
     PPU_ERR_GENERAL,
 };
 
+typedef enum ppu_power_mode_policy_type {
+    /* Power mode off */
+    PPU_PWR_POLICY_OFF,
+    /* Power mode FULL_RET */
+    PPU_PWR_POLICY_FULL_RET,
+    /* Power mode on */
+    PPU_PWR_POLICY_ON,
+}ppu_power_mode_policy_t;
+
 struct ppu_dev_t {
     /* Base address of the PPU registers */
     const uintptr_t ppu_base;
@@ -31,7 +40,8 @@ struct ppu_dev_t {
     const uintptr_t cluster_safety_base;
 };
 
-enum ppu_error_t ppu_driver_power_on(const struct ppu_dev_t *dev);
+enum ppu_error_t ppu_drv_cfg_power_policy(const struct ppu_dev_t *dev,
+                                          ppu_power_mode_policy_t pwr_policy);
 
 #ifdef __cplusplus
 }

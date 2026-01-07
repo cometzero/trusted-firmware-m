@@ -518,7 +518,8 @@ static int boot_platform_si_pre_load(void)
     }
 
     /* Power up SI power domain */
-    ppu_err = ppu_driver_power_on(&HOST_SI_SYSTOP_PPU_DEV);
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_SYSTOP_PPU_DEV,
+                                          PPU_PWR_POLICY_ON);
     if (ppu_err != PPU_ERR_NONE) {
         BOOT_LOG_ERR("BL2: SI SYSTOP release failed: %d", (int)ppu_err);
         return 1;
@@ -587,7 +588,8 @@ static int boot_platform_pre_load_si_cl0(void)
     }
 
     /* Power up SI CL0 */
-    ppu_err = ppu_driver_power_on(&HOST_SI_CL0_CLUS_PPU_DEV);
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_CL0_CLUS_PPU_DEV,
+                                          PPU_PWR_POLICY_ON);
     if (ppu_err != PPU_ERR_NONE) {
         BOOT_LOG_ERR("BL2: SI CL0 CLUS release failed: %d", (int)ppu_err);
         return 1;
@@ -657,7 +659,8 @@ static int boot_platform_post_load_si_cl0(void)
         return 1;
     }
 
-    si_cl0_err = ppu_driver_power_on(&HOST_SI_CL0_CORE0_PPU_DEV);
+    si_cl0_err = ppu_drv_cfg_power_policy(&HOST_SI_CL0_CORE0_PPU_DEV,
+                                             PPU_PWR_POLICY_ON);
     if (si_cl0_err != PPU_ERR_NONE) {
         BOOT_LOG_ERR("BL2: SI CL0 CORE0 release failed: %d", (int)si_cl0_err);
         return 1;
@@ -706,7 +709,8 @@ static int boot_platform_pre_load_si_cl1(void)
     }
 
     /* Power up SI CL1 */
-    ppu_err = ppu_driver_power_on(&HOST_SI_CL1_CLUS_PPU_DEV);
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_CL1_CLUS_PPU_DEV,
+                                          PPU_PWR_POLICY_ON);
     if (ppu_err != PPU_ERR_NONE) {
         BOOT_LOG_ERR("BL2: SI CL0 CLUS release failed: %d", (int)ppu_err);
         return 1;
