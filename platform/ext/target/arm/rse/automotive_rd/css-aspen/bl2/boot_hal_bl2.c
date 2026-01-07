@@ -32,6 +32,7 @@
 #define MAX_RETRIES_PROTOCOL_VER    3
 
 #define LBIST_WAIT_CYCLES           12500000
+#define MBIST_WAIT_CYCLES           10000000
 
 extern struct flash_area flash_map[];
 extern const int flash_map_entry_num;
@@ -537,6 +538,15 @@ static int trigger_lbist_si(void)
     return 0;
 }
 
+static int trigger_mbist_si(void)
+{
+    BOOT_LOG_INF("BL2: SI MBIST happens here");
+
+    /* Mimic the MBIST execution with a delay. */
+    delay_cycles(MBIST_WAIT_CYCLES);
+    return 0;
+}
+
 /* Enable SI PIK is powered on */
 static int boot_platform_si_pre_load(void)
 {
@@ -619,6 +629,7 @@ static int boot_platform_pre_load_si_cl0(void)
 {
     enum atu_error_t atu_err;
     enum ppu_error_t ppu_err;
+    int error;
 
     BOOT_LOG_INF("BL2: SI CL0 pre load start");
 
@@ -632,11 +643,39 @@ static int boot_platform_pre_load_si_cl0(void)
         return 1;
     }
 
+    /*
+     * Halt the cpus and turn on the cpu power
+     */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI SID window", (int)atu_err);
+        return false;
+    }
+
+    scr_cfg_cpuhalt(&HOST_SI_SCR_DEV, true);
+
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SCR window", (int)atu_err);
+        return false;
+    }
+
     /* Power up SI CL0 */
     ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_CL0_CLUS_PPU_DEV,
-                                          PPU_PWR_POLICY_ON);
+                                       PPU_PWR_POLICY_ON);
     if (ppu_err != PPU_ERR_NONE) {
         BOOT_LOG_ERR("BL2: SI CL0 CLUS release failed: %d", (int)ppu_err);
+        return 1;
+    }
+
+    /* Trigger MBIST for SI SRAM, TCM, cache memories */
+    error = trigger_mbist_si();
+    if(error != 0) {
+        BOOT_LOG_ERR("BL2: SI MBIST failed");
         return 1;
     }
 
@@ -716,6 +755,25 @@ static int boot_platform_post_load_si_cl0(void)
     atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_CL0_CUB_ATU_ID);
     if (atu_err != ATU_ERR_NONE) {
         return 1;
+    }
+
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI SID window", (int)atu_err);
+        return false;
+    }
+
+    /* Unhalt/ release the cpus */
+    scr_cfg_cpuhalt(&HOST_SI_SCR_DEV, false);
+
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SCR window", (int)atu_err);
+        return false;
     }
 
     /* Close RSE ATU region configured to access RSE header region for SI CL0 */

@@ -33,6 +33,8 @@ enum rse_atu_ids {
     RSE_ATU_IMG_CODE_LOAD_ID,
     /* ID to use for region initializing firmware */
     RSE_ATU_FW_INIT_ID,
+    /* ID to use for SCR region */
+    RSE_ATU_SCR_ID,
 
     /* ATU region ID for AP secure flash */
     RSE_ATU_AP_FLASH_ID,
@@ -291,7 +293,7 @@ enum rse_atu_ids {
 #define HOST_SI_SCR_SIZE              ALIGN_UP(0x10000U,         \
                                                RSE_ATU_PAGE_SIZE)
 /* SI CL SCR ATU region id */
-#define HOST_SI_SCR_ATU_ID            RSE_ATU_FW_INIT_ID
+#define HOST_SI_SCR_ATU_ID            RSE_ATU_SCR_ID
 
 /* ATU region mapping to access Protected Storage */
 #define HOST_ACCESS_PS_BASE_S      (HOST_ACCESS_BASE_NS + RSE_FLASH_IMG_SIZE)
