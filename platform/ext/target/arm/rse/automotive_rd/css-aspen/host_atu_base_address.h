@@ -46,6 +46,10 @@ enum rse_atu_ids {
     RSE_ATU_AP_ATU_ID,
     /* ATU region ID for accessing shared memory SRAM bank group 0 in SI */
     RSE_ATU_SI_SSRAM_ID,
+    /*
+     * This must remain the last generic entry in the enum.
+     */
+    RSE_ATU_COUNT,
 };
 
 /*
