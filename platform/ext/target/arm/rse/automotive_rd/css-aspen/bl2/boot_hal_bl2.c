@@ -371,6 +371,30 @@ static enum atu_error_t initialize_ap_atu(void)
     if (atu_err != ATU_ERR_NONE) {
         return atu_err;
     }
+    /* Configure RSE ATU to access the SMD Expansion->SMD ATU */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                    HOST_SMDEXP2SMD_ATU_ID,
+                                    HOST_SMDEXP2SMD_ATU_BASE_S,
+                                    HOST_SMDEXP2SMD_ATU_PHYS_BASE,
+                                    HOST_SMDEXP2SMD_ATU_GPV_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    /* Initialize the translation regions of the SMD Expansion->SMD ATU */
+    atu_err = initialise_atu_regions(&HOST_SMDEXP2SMD_ATU_DEV,
+                                     SMDEXP2SMD_ATU_REGION_COUNT,
+                                     smdexp2smd_atu_regions,
+                                     "SMDEXP2SMD");
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    /* Close RSE ATU region configured to access the SMD Expansion->SMD ATU */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SMDEXP2SMD_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
 
     return ATU_ERR_NONE;
 }

@@ -46,6 +46,8 @@ enum rse_atu_ids {
     RSE_ATU_AP_ATU_ID,
     /* ATU region ID for accessing shared memory SRAM bank group 0 in SI */
     RSE_ATU_SI_SSRAM_ID,
+    /* ATU region ID for accessing SMD Expansion to SMD ATU */
+    RSE_ATU_SMDEXP2SMD_ATU_ID,
     /*
      * This must remain the last generic entry in the enum.
      */
@@ -298,6 +300,13 @@ enum rse_atu_ids {
                                                RSE_ATU_PAGE_SIZE)
 /* SI CL SCR ATU region id */
 #define HOST_SI_SCR_ATU_ID            RSE_ATU_SCR_ID
+
+/* ATU region mapping to access SMD Expansion's ATU from RSE */
+#define HOST_SMDEXP2SMD_ATU_BASE_S     (HOST_SI_SCR_ATU_WINDOW_BASE_S + \
+                                        HOST_SI_SCR_SIZE)
+#define HOST_SMDEXP2SMD_ATU_PHYS_BASE  0x20000D0070000
+#define HOST_SMDEXP2SMD_ATU_GPV_SIZE   ALIGN_UP(0x10000, RSE_ATU_PAGE_SIZE)
+#define HOST_SMDEXP2SMD_ATU_ID         RSE_ATU_SMDEXP2SMD_ATU_ID
 
 /* ATU region mapping to access Protected Storage */
 #define HOST_ACCESS_PS_BASE_S      (HOST_ACCESS_BASE_NS + RSE_FLASH_IMG_SIZE)

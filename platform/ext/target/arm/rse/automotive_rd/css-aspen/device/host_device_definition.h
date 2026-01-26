@@ -31,6 +31,7 @@ extern const struct scr_dev_t HOST_SI_SCR_DEV;
 #include "atu_rse_drv.h"
 extern struct atu_dev_t HOST_SI_ATU_DEV;
 extern struct atu_dev_t HOST_AP_ATU_DEV;
+extern struct atu_dev_t HOST_SMDEXP2SMD_ATU_DEV;
 
 /* Structure used to describe an ATU region */
 struct atu_map {
@@ -61,7 +62,15 @@ enum SI_ATU_REGIONS {
     SI_ATU_REGION_IDX_AP_GIC,
     SI_ATU_REGION_IDX_SHARED_SRAM,
     SI_ATU_REGION_IDX_SHARED_SRAM_NS,
+    SI_ATU_REGION_IDX_SMD_SMCF_MGI,
+    SI_ATU_REGION_IDX_SMCF_SRAM,
     SI_ATU_REGION_COUNT,
+};
+
+/* Indices for SMD Expansion ATU regions */
+enum SMDEXP2SMD_ATU_REGIONS {
+    SMDEXP2SMD_ATU_REGION_IDX_SMCF_SRAM,
+    SMDEXP2SMD_ATU_REGION_COUNT,
 };
 
 /* Indices for AP ATU regions */
@@ -69,11 +78,14 @@ enum AP_ATU_REGIONS {
     AP_ATU_REGION_IDX_GENERIC_TIMER,
     AP_ATU_REGION_IDX_PC_SI_MHU,
     AP_ATU_REGION_IDX_PC_RSE_MHU,
+    AP_ATU_REGION_IDX_SMCF_SRAM,
     AP_ATU_REGION_COUNT,
 };
 
 /* List of ATU regions configured by RSE in SI ATU */
 extern struct atu_map si_atu_regions[SI_ATU_REGION_COUNT];
+/* List of ATU regions configured by RSE in SMD Expansion ATU */
+extern const struct atu_map smdexp2smd_atu_regions[SMDEXP2SMD_ATU_REGION_COUNT];
 /* List of ATU regions configured by RSE in AP ATU */
 extern const struct atu_map ap_atu_regions[AP_ATU_REGION_COUNT];
 #endif /* PLATFORM_RSE_HAS_ATU_OWNERSHIP */
