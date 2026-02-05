@@ -42,7 +42,7 @@
 #define ITS_NUM_ASSETS 20
 
 /* The maximum asset size to be stored in the Protected Storage */
-#define PS_MAX_ASSET_SIZE                      6144
+#define PS_MAX_ASSET_SIZE                      7168
 
 /* The maximum number of assets to be stored in the Protected Storage area. */
 #if (TFM_PLATFORM_VARIANT == CSS_ASPEN_VARIANT_FVP)
