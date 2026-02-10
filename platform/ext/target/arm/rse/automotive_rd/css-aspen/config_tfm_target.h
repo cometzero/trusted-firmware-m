@@ -45,7 +45,11 @@
 #define PS_MAX_ASSET_SIZE                      6144
 
 /* The maximum number of assets to be stored in the Protected Storage area. */
+#if (TFM_PLATFORM_VARIANT == CSS_ASPEN_VARIANT_FVP)
 #define PS_NUM_ASSETS                          30
+#elif (TFM_PLATFORM_VARIANT == CSS_ASPEN_VARIANT_RTL)
+#define PS_NUM_ASSETS                          20
+#endif
 
 /* This is needed to be able to process the EFI variables during PS writes. */
 #undef CRYPTO_ENGINE_BUF_SIZE
