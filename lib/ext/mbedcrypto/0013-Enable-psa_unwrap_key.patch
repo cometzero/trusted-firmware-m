@@ -1,0 +1,67 @@
+From 8c0e275d85a867ded4dc949d7981c7f4e0f1c23b Mon Sep 17 00:00:00 2001
+From: Athul P Satheesan <athul.ps@arm.com>
+Date: Thu, 19 Feb 2026 15:09:03 +0530
+Subject: [PATCH 13/13] Enable psa_unwrap_key
+
+psa_unwrap_key is required for image decryption in runtime.
+key unwrap support is only available from PSA Crypto API 1.4.0.
+After switching to the new version, this change is not required.
+
+Signed-off-by: Athul P Satheesan <athul.ps@arm.com>
+---
+ library/psa_crypto.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/library/psa_crypto.c b/library/psa_crypto.c
+index 22f143bdfc..6675dca42c 100644
+--- a/library/psa_crypto.c
++++ b/library/psa_crypto.c
+@@ -72,6 +72,7 @@
+ #include "mbedtls/sha512.h"
+ #include "mbedtls/psa_util.h"
+ #include "mbedtls/threading.h"
++#include "mbedtls/nist_kw.h"
+ 
+ #include "constant_time_internal.h"
+ 
+@@ -1560,6 +1561,37 @@ exit:
+     return (status == PSA_SUCCESS) ? unlock_status : status;
+ }
+ 
++psa_status_t psa_unwrap_key(const psa_key_attributes_t *attributes,
++                            psa_key_id_t wrap_key_id,
++                            psa_algorithm_t alg,
++                            const uint8_t *data,
++                            size_t data_length,
++                            psa_key_id_t *key_id)
++{
++    psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
++    unsigned char key[PSA_CIPHER_MAX_KEY_LENGTH] = {0};
++    size_t output_length = 0;
++    mbedtls_svc_key_id_t mbedtls_wrap_key_id;
++
++    (void) alg;
++    mbedtls_wrap_key_id.key_id = wrap_key_id;
++    status = mbedtls_nist_kw_unwrap(mbedtls_wrap_key_id, MBEDTLS_KW_MODE_KW,
++                                    data, data_length,
++                                    &key[0], sizeof(key),
++                                    &output_length);
++    if (status != PSA_SUCCESS) {
++        return status;
++    }
++    status = psa_import_key(attributes, (const uint8_t *) key,
++                            output_length, key_id);
++    if (status != PSA_SUCCESS) {
++        return status;
++    }
++
++    status = psa_destroy_key(mbedtls_wrap_key_id);
++    return status;
++}
++
+ psa_status_t psa_export_public_key_internal(
+     const psa_key_attributes_t *attributes,
+     const uint8_t *key_buffer,
+-- 
+2.34.1
+
