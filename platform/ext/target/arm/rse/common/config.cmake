@@ -91,6 +91,9 @@ endif()
 set(ATTEST_KEY_BITS                     384        CACHE STRING   "The size of the initial attestation key in bits")
 set(PSA_INITIAL_ATTEST_MAX_TOKEN_SIZE   0x800      CACHE STRING    "The maximum possible size of a token")
 
+################# Decryption ###################################################
+set(TFM_RUNTIME_DECRYPTION                ON         CACHE BOOL     "Enable runtime decryption")
+
 ######################### BL1 ##################################################
 
 set(RSE_SUPPORT_ROM_LIB_RELOCATION      OFF        CACHE BOOL "Whether shared ROM code supports being copied to SRAM and then executed")

@@ -350,6 +350,10 @@ if (TFM_PARTITION_CRYPTO)
             ./device/config
             ${RSE_SUBPLATFORM_PAL_CONFIG_DIR}
     )
+    target_compile_definitions(platform_crypto_keys
+    PRIVATE
+        $<$<BOOL:${TFM_RUNTIME_DECRYPTION}>:TFM_RUNTIME_DECRYPTION>
+    )
 endif()
 
 #========================= Platform BL2 =======================================#

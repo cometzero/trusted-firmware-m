@@ -22,6 +22,7 @@
 #define NUMBER_OF_ELEMENTS_OF(x) sizeof(x)/sizeof(*x)
 #define MAPPED_RSE_MBOX_NS_AGENT_DEFAULT_CLIENT_ID -0x04000000
 #define TFM_NS_PARTITION_ID                        MAPPED_RSE_MBOX_NS_AGENT_DEFAULT_CLIENT_ID
+#define ENC_KEY_LEN 32
 
 static enum tfm_plat_err_t tfm_plat_get_huk(const void *ctx,
                                             uint8_t *buf, size_t buf_len,
@@ -48,6 +49,39 @@ static enum tfm_plat_err_t tfm_plat_get_huk(const void *ctx,
 
     return TFM_PLAT_ERR_SUCCESS;
 }
+
+#ifdef TFM_RUNTIME_DECRYPTION
+static enum tfm_plat_err_t tfm_plat_get_kek(const void *ctx,
+                                     uint8_t *buf, size_t buf_len,
+                                     size_t *key_len,
+                                     psa_key_bits_t *key_bits,
+                                     psa_algorithm_t *algorithm,
+                                     psa_key_type_t *type)
+{
+    if (buf_len < 32) {
+        return TFM_PLAT_ERR_SYSTEM_ERR;
+    }
+
+    /*
+     * This key is temporarily added until provision for getting the key from
+     * the key slot is in place
+     */
+    static uint8_t test_enc_key[ENC_KEY_LEN] = {
+        0x67, 0xdb, 0x6f, 0x5c, 0xc0, 0xb2, 0x92, 0xfc,
+        0x05, 0xfb, 0xcf, 0x50, 0x1e, 0xe5, 0x70, 0x0b,
+        0xd8, 0xd0, 0x82, 0xa0, 0x53, 0x94, 0xe2, 0x02,
+        0x74, 0x10, 0x37, 0x81, 0x4c, 0x79, 0xd6, 0xa8};
+
+    *key_len = ENC_KEY_LEN;
+    *key_bits = *key_len * 8;
+    *type = PSA_KEY_TYPE_AES;
+    *algorithm = PSA_ALG_ECB_NO_PADDING;
+
+    memcpy(buf, test_enc_key, ENC_KEY_LEN);
+
+    return TFM_PLAT_ERR_SUCCESS;
+}
+#endif /* TFM_RUNTIME_DECRYPTION */
 
 static enum tfm_plat_err_t tfm_plat_get_iak(const void *ctx,
                                      uint8_t *buf, size_t buf_len,
@@ -385,6 +419,11 @@ static const tfm_plat_builtin_key_policy_t g_builtin_keys_policy[] = {
      .per_user_policy = NUMBER_OF_ELEMENTS_OF(g_rot_cdi_per_user_policy),
      .policy_ptr = g_rot_cdi_per_user_policy},
 #endif /* TFM_PARTITION_DPE */
+#ifdef TFM_RUNTIME_DECRYPTION
+    {.key_id = TFM_BUILTIN_KEY_ID_KEK,
+     .per_user_policy = 0,
+     .usage = PSA_KEY_USAGE_UNWRAP | PSA_KEY_USAGE_DECRYPT},
+#endif /* TFM_RUNTIME_DECRYPTION */
 };
 
 /**
@@ -417,6 +456,13 @@ static const tfm_plat_builtin_key_descriptor_t g_builtin_keys_desc[] = {
      .loader_key_func = tfm_plat_get_rot_cdi,
      .loader_key_ctx = NULL},
 #endif /* TFM_PARTITION_DPE */
+#ifdef TFM_RUNTIME_DECRYPTION
+    {.key_id = TFM_BUILTIN_KEY_ID_KEK,
+     .slot_number = TFM_BUILTIN_KEY_SLOT_KEK,
+     .lifetime = TFM_BUILTIN_KEY_LOADER_LIFETIME,
+     .loader_key_func = tfm_plat_get_kek,
+     .loader_key_ctx = NULL},
+#endif /* TFM_RUNTIME_DECRYPTION */
 };
 
 size_t tfm_plat_builtin_key_get_policy_table_ptr(const tfm_plat_builtin_key_policy_t *policy_ptr[])

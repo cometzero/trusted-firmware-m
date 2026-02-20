@@ -99,6 +99,11 @@ target_compile_definitions(tfm_psa_rot_partition_crypto
         $<$<STREQUAL:${CRYPTO_HW_ACCELERATOR_TYPE},cc312>:CRYPTO_HW_ACCELERATOR_CC312>
 )
 
+target_compile_definitions(tfm_psa_rot_partition_crypto
+    PRIVATE
+        $<$<BOOL:${TFM_RUNTIME_DECRYPTION}>:TFM_RUNTIME_DECRYPTION>
+)
+
 ############################ Partition Defs ####################################
 
 target_link_libraries(tfm_partitions
