@@ -91,6 +91,7 @@
         PSA_FUNCTION_NAME(psa_reset_key_attributes)
 #define psa_export_key \
         PSA_FUNCTION_NAME(psa_export_key)
+#define psa_unwrap_key PSA_FUNCTION_NAME(psa_unwrap_key)
 #define psa_export_public_key \
         PSA_FUNCTION_NAME(psa_export_public_key)
 #define psa_purge_key \

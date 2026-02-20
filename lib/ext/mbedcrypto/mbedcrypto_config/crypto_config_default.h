@@ -142,4 +142,5 @@
 #include "crypto_accelerator_config.h"
 #endif
 
+#define MBEDTLS_NIST_KW_C
 #endif /* PSA_CRYPTO_CONFIG_H */

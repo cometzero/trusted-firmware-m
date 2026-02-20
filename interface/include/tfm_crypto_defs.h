@@ -93,7 +93,8 @@ enum tfm_crypto_group_id_t {
     X(TFM_CRYPTO_EXPORT_PUBLIC_KEY)                \
     X(TFM_CRYPTO_PURGE_KEY)                        \
     X(TFM_CRYPTO_COPY_KEY)                         \
-    X(TFM_CRYPTO_GENERATE_KEY)
+    X(TFM_CRYPTO_GENERATE_KEY)                     \
+    X(TFM_CRYPTO_UNWRAP_KEY)
 
 #define HASH_FUNCS                                 \
     X(TFM_CRYPTO_HASH_COMPUTE)                     \

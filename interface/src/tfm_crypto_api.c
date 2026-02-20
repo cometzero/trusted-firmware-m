@@ -209,6 +209,32 @@ TFM_CRYPTO_API(psa_status_t, psa_export_key)(psa_key_id_t key,
     return status;
 }
 
+TFM_CRYPTO_API(psa_status_t, psa_unwrap_key)(const psa_key_attributes_t *attributes,
+                                             psa_key_id_t wrapped_key,
+                                             psa_algorithm_t alg,
+                                             const uint8_t *data,
+                                             size_t data_size,
+                                             psa_key_id_t *key)
+ {
+  psa_status_t status;
+  struct tfm_crypto_pack_iovec iov = {
+      .function_id = TFM_CRYPTO_UNWRAP_KEY_SID,
+      .key_id = wrapped_key,
+      .alg = alg,
+
+  };
+  psa_invec in_vec[] = {
+      {.base = &iov, .len = sizeof(struct tfm_crypto_pack_iovec)},
+      {.base = attributes, .len = sizeof(psa_key_attributes_t)},
+      {.base = data, .len = data_size},
+  };
+  psa_outvec out_vec[] = {{.base = key, .len = sizeof(psa_key_id_t)}};
+
+  status = API_DISPATCH(in_vec, out_vec);
+
+  return status;
+}
+
 TFM_CRYPTO_API(psa_status_t, psa_export_public_key)(psa_key_id_t key,
                                                     uint8_t *data,
                                                     size_t data_size,

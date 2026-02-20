@@ -139,7 +139,10 @@ target_sources(bootutil
 
 add_library(runtime_image_loader STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/bootloader/rse_image_loader/src/rse_image_load_util.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/bootloader/rse_image_loader/src/tlv.c
     ${CMAKE_SOURCE_DIR}/bl2/src/flash_map.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/bl2/flash_map_bl2.c
+    ${CMAKE_SOURCE_DIR}/platform/ext/common/boot_hal_bl2.c
     $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu/fwu_hal_bl2.c>
     $<$<BOOL:${TFM_PARTITION_FIRMWARE_UPDATE}>:${CMAKE_CURRENT_SOURCE_DIR}/fwu/fwu_private_metadata.c>
 )
@@ -154,12 +157,14 @@ target_include_directories(runtime_image_loader
 
 target_link_libraries(runtime_image_loader
     PRIVATE
-        bl2_crypto
+        bl2_crypto_config
+        tfm_sprt
 )
 
 target_compile_definitions(runtime_image_loader
     PRIVATE
         $<$<BOOL:${PLATFORM_RSE_HAS_ATU_OWNERSHIP}>:PLATFORM_RSE_HAS_ATU_OWNERSHIP>
+        $<$<BOOL:${TFM_RUNTIME_DECRYPTION}>:TFM_RUNTIME_DECRYPTION>
 )
 
 #========================= Platform Secure ====================================#

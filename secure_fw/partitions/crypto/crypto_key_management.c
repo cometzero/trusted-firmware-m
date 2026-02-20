@@ -39,13 +39,16 @@ psa_status_t tfm_crypto_key_management_interface(psa_invec in_vec[],
     case TFM_CRYPTO_IMPORT_KEY_SID:
     case TFM_CRYPTO_COPY_KEY_SID:
     case TFM_CRYPTO_GENERATE_KEY_SID:
-        if ((in_vec[1].base == NULL) ||
-            (in_vec[1].len != (sizeof(srv_key_attr) - TFM_CRYPTO_KEY_ATTR_OFFSET_CLIENT_SERVER))) {
-            return PSA_ERROR_PROGRAMMER_ERROR;
-        }
-        memcpy(&srv_key_attr, in_vec[1].base, in_vec[1].len);
-        tfm_crypto_library_get_library_key_id_set_owner(encoded_key->owner, &srv_key_attr);
-        break;
+    case TFM_CRYPTO_UNWRAP_KEY_SID:
+      if ((in_vec[1].base == NULL) ||
+          (in_vec[1].len !=
+           (sizeof(srv_key_attr) - TFM_CRYPTO_KEY_ATTR_OFFSET_CLIENT_SERVER))) {
+        return PSA_ERROR_PROGRAMMER_ERROR;
+      }
+      memcpy(&srv_key_attr, in_vec[1].base, in_vec[1].len);
+      tfm_crypto_library_get_library_key_id_set_owner(encoded_key->owner,
+                                                      &srv_key_attr);
+      break;
     default:
         break;
     }
@@ -115,8 +118,15 @@ psa_status_t tfm_crypto_key_management_interface(psa_invec in_vec[],
         if (status != PSA_SUCCESS) {
             out_vec[0].len = 0;
         }
-    }
-    break;
+    } break;
+    case TFM_CRYPTO_UNWRAP_KEY_SID: {
+      const uint8_t *data = in_vec[2].base;
+      size_t data_size = in_vec[2].len;
+      psa_key_id_t *key_id = out_vec[0].base;
+
+      status = psa_unwrap_key(&srv_key_attr, iov->key_id, iov->alg, data,
+                              data_size, key_id);
+    } break;
     case TFM_CRYPTO_EXPORT_PUBLIC_KEY_SID:
     {
         uint8_t *data = out_vec[0].base;

@@ -3,16 +3,19 @@
  * SPDX-FileCopyrightText: Copyright The TrustedFirmware-M Contributors
  */
 
+#include <psa/crypto.h>
 #include <string.h>
 
 #include "bootutil/boot_record.h"
 #include "bootutil/bootutil_log.h"
+#include "bootutil/image.h"
 #include "device_definition.h"
 #include "fip_parser.h"
 #include "flash_layout.h"
 #include "fwu_hal_bl2.h"
 #include "host_base_address.h"
 #include "rse_image_load_util.h"
+#include "tfm_builtin_key_ids.h"
 #include "tfm_plat_defs.h"
 
 #ifdef MCUBOOT_ENCRYPT_RSA
@@ -20,6 +23,10 @@
 #else
 #define BL2_MBEDTLS_MEM_BUF_LEN 0x2000
 #endif
+
+#define IMAGE_RAM_BASE ((uintptr_t)0)
+#define EXPECTED_ENC_LEN (24)
+#define MAX_CHUNK 1024U
 
 extern ARM_DRIVER_FLASH AP_FLASH_DEV_NAME;
 extern struct flash_area flash_map[];
@@ -330,6 +337,157 @@ static int rse_image_post_load_ap_bl2(void)
     return 0;
 }
 
+static psa_status_t ctr_decrypt_chunk(psa_key_id_t aes_key,
+                                      uint32_t payload_off_bytes,
+                                      const uint8_t *in,
+                                      size_t len,
+                                      uint8_t *out)
+{
+    psa_cipher_operation_t op = psa_cipher_operation_init();
+    uint8_t iv[16] = {0};
+    size_t out_len = 0;
+    psa_status_t st;
+
+    /* Set counter = block index within encrypted region */
+    uint32_t blk = (payload_off_bytes >> 4);
+    iv[12] = (uint8_t)(blk >> 24);
+    iv[13] = (uint8_t)(blk >> 16);
+    iv[14] = (uint8_t)(blk >> 8);
+    iv[15] = (uint8_t)(blk);
+
+    st = psa_cipher_decrypt_setup(&op, aes_key, PSA_ALG_CTR);
+    if (st != PSA_SUCCESS)
+        goto out;
+
+    st = psa_cipher_set_iv(&op, iv, sizeof(iv));
+    if (st != PSA_SUCCESS)
+        goto out;
+
+    st = psa_cipher_update(&op, in, len, out, len, &out_len);
+    if (st != PSA_SUCCESS)
+        goto out;
+
+    st = psa_cipher_finish(&op, out + out_len, len - out_len, &out_len);
+
+out:
+    psa_cipher_abort(&op);
+
+    return st;
+}
+
+static int rse_ap_bl2_load_and_decrypt(const struct flash_area *fa,
+                                       const struct image_header *hdr)
+{
+    uint32_t src_sz =
+        (hdr->ih_hdr_size + hdr->ih_img_size + hdr->ih_protect_tlv_size);
+    uint8_t *ram_dst = (void *)(IMAGE_RAM_BASE + hdr->ih_load_addr);
+    struct image_tlv_info info;
+    uint16_t len;
+    int rc;
+    uint32_t off;
+    uint32_t chunk;
+    uint32_t payload_size;
+    uint32_t done = 0;
+    uint32_t img_base, img_end;
+    uint8_t *payload_ram;
+
+#ifdef TFM_RUNTIME_DECRYPTION
+    psa_key_id_t key_id = TFM_BUILTIN_KEY_ID_KEK;
+    psa_status_t status = PSA_ERROR_INVALID_ARGUMENT;
+    psa_key_id_t output_key_id = PSA_KEY_ID_NULL;
+    psa_key_attributes_t key_attributes;
+#endif /* TFM_RUNTIME_DECRYPTION */
+
+    rc = flash_area_read(fa, src_sz, &info, sizeof(info));
+    if (rc != 0) {
+        BOOT_LOG_INF("AP_BL2: flash_area_read(image) failed rc:%d\r\n", rc);
+        return rc;
+    }
+    if (info.it_magic != IMAGE_TLV_INFO_MAGIC &&
+            info.it_magic != IMAGE_TLV_PROT_INFO_MAGIC) {
+        BOOT_LOG_ERR("AP_BL2: invalid TLV magic 0x%x\r\n", info.it_magic);
+        return -1;
+    }
+    src_sz += info.it_tlv_tot;
+
+    /* Compute RAM destination for full image (header + payload + TLVs) */
+    img_base = IMAGE_RAM_BASE + hdr->ih_load_addr + hdr->ih_hdr_size;
+    img_end  = img_base + src_sz;
+
+    /* Sanity check against AP BL2 SRAM window */
+    if ((img_base < HOST_AP_BL2_IMG_CODE_BASE_S) ||
+            (img_end  > HOST_AP_BL2_IMG_CODE_BASE_S + HOST_AP_BL2_ATU_SIZE)) {
+
+        BOOT_LOG_ERR("AP_BL2: image region [0x%08x..0x%08x) "
+                "outside RSE AP BL2 SRAM window [0x%08x..0x%08x)\r\n",
+                (unsigned)img_base, (unsigned)img_end,
+                (unsigned)HOST_AP_BL2_IMG_CODE_BASE_S,
+                (unsigned)(HOST_AP_BL2_IMG_CODE_BASE_S +
+                    HOST_AP_BL2_ATU_SIZE));
+
+        return -1;
+    }
+    /* Load full image into RAM */
+    rc = flash_area_read(fa, 0, ram_dst, src_sz);
+    if (rc != 0) {
+        BOOT_LOG_INF("AP_BL2: flash_area_read(image) failed rc:%d\r\n", rc);
+        return rc;
+    }
+
+#ifdef TFM_RUNTIME_DECRYPTION
+    /* Locate encrypted key TLV */
+    rc = rse_find_tlv(hdr, ram_dst, false, &off, &len);
+    if (rc != 0) {
+        BOOT_LOG_INF("AP_BL2: rse_find_tlv failed rc:%d\r\n", rc);
+        return rc;
+    }
+    if (len != EXPECTED_ENC_LEN) {
+        return -1;
+    }
+
+    const uint8_t *wrapped_key = (const uint8_t *)(ram_dst + off);
+
+    /* Unwrap AES key */
+    key_attributes = psa_key_attributes_init();
+    psa_set_key_algorithm(&key_attributes, PSA_ALG_CTR);
+    psa_set_key_type(&key_attributes, PSA_KEY_TYPE_AES);
+    psa_set_key_usage_flags(&key_attributes, PSA_KEY_USAGE_DECRYPT);
+
+    status = psa_unwrap_key(&key_attributes, key_id, PSA_ALG_ECB_NO_PADDING,
+            wrapped_key, EXPECTED_ENC_LEN, &output_key_id);
+    if (status != PSA_SUCCESS) {
+        BOOT_LOG_INF("AP_BL2: key unwrap failed status:%d", status);
+        return status;
+    }
+
+    /* Decrypt payload in place */
+    payload_size = hdr->ih_img_size;
+    payload_ram = ram_dst + hdr->ih_hdr_size;
+
+    while (done < payload_size) {
+        chunk = payload_size - done;
+        if (chunk > MAX_CHUNK) {
+            chunk = MAX_CHUNK;
+        }
+        /* payload offset (bytes) relative to start of payload region */
+        rc = ctr_decrypt_chunk(output_key_id, done, (payload_ram + done), chunk,
+                (payload_ram + done));
+        if (rc != PSA_SUCCESS) {
+            BOOT_LOG_ERR("AP BL2: CTR decrypt failed st=%d at off=%u", rc, done);
+            psa_destroy_key(output_key_id);
+            return -1;
+        }
+        done += chunk;
+    }
+    psa_destroy_key(output_key_id);
+
+    BOOT_LOG_INF("AP_BL2: load and decrypt complete");
+#else
+    BOOT_LOG_INF("AP_BL2: load complete");
+#endif /* TFM_RUNTIME_DECRYPTION */
+    return 0;
+}
+
 /*
  * Helper: load primary slot for AP BL2 from flash into AP_BL2_RAM_BASE and
  * verify hash from TLV using Mbed TLS SHA-256.
@@ -373,35 +531,11 @@ static int rse_ap_bl2_load_and_validate(void)
         return -1;
     }
 
-    /* Compute RAM destination for CODE (not header) */
-    code_base = hdr.ih_load_addr + hdr.ih_hdr_size;
-    code_size = hdr.ih_img_size;
-    flash_off = hdr.ih_hdr_size;
-    code_end  = code_base + code_size;
-
-    /* Sanity check against AP BL2 SRAM window */
-    if ((code_base < HOST_AP_BL2_IMG_CODE_BASE_S) ||
-        (code_end > HOST_AP_BL2_IMG_CODE_BASE_S + HOST_AP_BL2_ATU_SIZE)) {
-        BOOT_LOG_ERR("AP_BL2: code region [0x%08x..0x%08x) "
-                     "outside RSE AP BL2 SRAM window [0x%08x..0x%08x)\r\n",
-                     (unsigned)code_base, (unsigned)code_end,
-                     (unsigned)HOST_AP_BL2_IMG_CODE_BASE_S,
-                     (unsigned)(HOST_AP_BL2_IMG_CODE_BASE_S +
-                                HOST_AP_BL2_ATU_SIZE));
-        flash_area_close(fa);
-        return -1;
-    }
-
-    /* Copy image body from flash to RAM (into CODE region) */
-    rc = flash_area_read(fa, flash_off, (void *)code_base, code_size);
-    flash_area_close(fa);
-
+    rc = rse_ap_bl2_load_and_decrypt(fa, &hdr);
     if (rc != 0) {
-        BOOT_LOG_INF("AP_BL2: image body read failed, rc=%d\r\n", rc);
-        return rc;
+      BOOT_LOG_INF("AP_BL2: load and decrypt failed");
+      return rc;
     }
-
-    BOOT_LOG_INF("AP_BL2: image load complete");
     return 0;
 }
 
