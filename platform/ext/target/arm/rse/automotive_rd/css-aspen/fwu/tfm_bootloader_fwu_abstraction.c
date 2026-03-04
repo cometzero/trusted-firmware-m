@@ -92,8 +92,28 @@ psa_status_t fwu_bootloader_staging_area_init(psa_fwu_component_t component,
                                               const void *manifest,
                                               size_t manifest_size)
 {
+    const struct fwu_image_location *image_bank;
+    uint32_t update_offset;
+    psa_status_t status;
+    uint8_t update_bank;
+
     (void)manifest;
     (void)manifest_size;
+
+    image_bank = fwu_get_image_location(component);
+    if (image_bank == NULL) {
+        return PSA_ERROR_INVALID_ARGUMENT;
+    }
+
+    update_bank = fwu_mdata.active_index ^ 1;
+    update_offset = image_bank->partition_offset[update_bank];
+
+    /* Erase contents from the update bank to prepare for firmware update. */
+    status = fwu_flash_erase(image_bank->flash, update_offset,
+                             image_bank->partition_size);
+    if (status != PSA_SUCCESS) {
+        return status;
+    }
 
     return fwu_update_component_state(component, PSA_FWU_WRITING_CANDIDATE,
                                       false);
@@ -114,7 +134,7 @@ psa_status_t fwu_bootloader_load_image(psa_fwu_component_t component,
     }
 
     image_bank = fwu_get_image_location(component);
-    if (component != image_bank->component) {
+    if (image_bank == NULL) {
         return PSA_ERROR_INVALID_ARGUMENT;
     }
 
@@ -334,6 +354,10 @@ psa_status_t fwu_bootloader_get_image_info(psa_fwu_component_t component, bool q
     }
 
     image_bank = fwu_get_image_location(component);
+    if (image_bank == NULL) {
+        return PSA_ERROR_INVALID_ARGUMENT;
+    }
+
     info->max_size = image_bank->partition_size;
     info->location = image_bank->partition_offset[fwu_mdata.active_index];
 
