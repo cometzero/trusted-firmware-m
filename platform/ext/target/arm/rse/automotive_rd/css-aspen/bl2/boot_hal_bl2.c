@@ -36,6 +36,8 @@
 #define LBIST_WAIT_CYCLES           12500000
 #define MBIST_WAIT_CYCLES           10000000
 
+#define CL1_BOOT_WAIT_CYCLES        10000000
+
 extern struct flash_area flash_map[];
 extern const int flash_map_entry_num;
 extern ARM_DRIVER_FLASH AP_FLASH_DEV_NAME;
@@ -653,6 +655,32 @@ static int boot_platform_si_pre_load(void)
  * =========================== SI CL0 LOAD FUNCTIONS ===========================
  */
 
+ static bool check_si_cl1_is_present(void)
+{
+    enum atu_error_t atu_err;
+    bool present = false;
+
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI SID window", (int)atu_err);
+        return false;
+    }
+
+    present = scr_sid_is_cl1_present(&HOST_SI_SCR_DEV);
+
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SCR window", (int)atu_err);
+        return false;
+    }
+
+    return present;
+}
+
 static enum atu_error_t initialize_si_atu(void)
 {
     enum atu_error_t atu_err;
@@ -929,6 +957,12 @@ static int boot_platform_post_load_si_cl0(void)
 
     BOOT_LOG_INF("BL2: SI CL0 post load complete");
 
+    /* Introduce a startup delay to ensure SI CL1 has enough time to begin
+     * booting and finish the PFDI Out-of-Reset(OOR) sequence before subsequent
+     * steps run. */
+    if (check_si_cl1_is_present()) {
+        delay_cycles(CL1_BOOT_WAIT_CYCLES);
+    }
     return 0;
 }
 
@@ -1017,32 +1051,6 @@ static int boot_platform_post_load_si_cl1(void)
     BOOT_LOG_INF("BL2: SI CL1 post load complete");
 
     return 0;
-}
-
-static bool check_si_cl1_is_present(void)
-{
-    enum atu_error_t atu_err;
-    bool present = false;
-
-    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
-                                        HOST_SI_SCR_ATU_ID,
-                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
-                                        HOST_SI_SCR_PHYS_BASE,
-                                        HOST_SI_SCR_SIZE);
-    if (atu_err != ATU_ERR_NONE) {
-        BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI SID window", (int)atu_err);
-        return false;
-    }
-
-    present = scr_sid_is_cl1_present(&HOST_SI_SCR_DEV);
-
-    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
-    if (atu_err != ATU_ERR_NONE) {
-        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SCR window", (int)atu_err);
-        return false;
-    }
-
-    return present;
 }
 
 /*
