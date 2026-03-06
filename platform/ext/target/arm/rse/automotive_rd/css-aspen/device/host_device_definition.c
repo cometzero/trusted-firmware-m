@@ -225,16 +225,46 @@ const struct atu_map ap_atu_regions[AP_ATU_REGION_COUNT] = {
         .size = 0x20000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
-    [AP_ATU_REGION_IDX_PC_SI_MHU] = {
+    [AP_ATU_REGION_IDX_PC_SI_MHU_PC2SI0_DOM0_NS] = {
         .log_addr = 0x40020000UL,
         .phy_addr = 0x400003B000000ULL,
-        .size = 0x600000UL,
+        .size = 0x30000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_NON_SECURE_PAS,
+    },
+    [AP_ATU_REGION_IDX_PC_SI_MHU_SI02PC_DOM0_NS] = {
+        .log_addr = 0x40050000UL,
+        .phy_addr = 0x400003B040000ULL,
+        .size = 0x30000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_NON_SECURE_PAS,
+    },
+    [AP_ATU_REGION_IDX_PC_SI_MHU_SI02PC_DOM1_S] = {
+        .log_addr = 0x40080000UL,
+        .phy_addr = 0x400003B080000ULL,
+        .size = 0x30000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
-    [AP_ATU_REGION_IDX_PC_RSE_MHU] = {
+    [AP_ATU_REGION_IDX_PC_SI_MHU_PC2SI1_DOM0_NS] = {
+        .log_addr = 0x400B0000UL,
+        .phy_addr = 0x400003B100000ULL,
+        .size = 0x30000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_NON_SECURE_PAS,
+    },
+    [AP_ATU_REGION_IDX_PC_SI_MHU_SI12PC_DOM0_NS] = {
+        .log_addr = 0x400E0000UL,
+        .phy_addr = 0x400003B140000ULL,
+        .size = 0x30000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_NON_SECURE_PAS,
+    },
+    [AP_ATU_REGION_IDX_PC_SI_MHU_PC2SI0_DOM3_S] = {
+        .log_addr = 0x40110000UL,
+        .phy_addr = 0x400003B380000ULL,
+        .size = 0x30000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
+    },
+    [AP_ATU_REGION_IDX_PC_RSE_MHU_S] = {
         .log_addr = 0x40680000UL,
         .phy_addr = 0x0300001B600000ULL,
-        .size = 0xC0000UL,
+        .size = 0x60000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
     [AP_ATU_REGION_IDX_SMCF_SRAM] = {
