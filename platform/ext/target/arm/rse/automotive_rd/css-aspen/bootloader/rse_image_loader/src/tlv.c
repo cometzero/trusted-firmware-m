@@ -42,17 +42,18 @@
  *          1  if ENCKW TLV was not found
  *         <0  on errors
  */
-int rse_find_tlv(const struct image_header *hdr,
-        const uint8_t *img_base,
-        bool prot,
-        uint32_t *enc_kw_off,
-        uint16_t *enc_kw_len)
+int rse_find_tlv_by_type(const struct image_header *hdr,
+                         const uint8_t *img_base,
+                         bool prot,
+                         uint16_t tlv_type,
+                         uint32_t *tlv_off_out,
+                         uint16_t *tlv_len_out)
 {
     struct image_tlv_info info;
     struct image_tlv tlv;
     uint32_t off_base, prot_end, tlv_end, tlv_off;
 
-    if (!hdr || !img_base || !enc_kw_off) {
+    if (!hdr || !img_base || !tlv_off_out) {
         return RSE_TLV_ERR_INVALID_ARG;
     }
 
@@ -106,10 +107,10 @@ int rse_find_tlv(const struct image_header *hdr,
             return RSE_TLV_NOT_FOUND;
         }
 
-        if (tlv.it_type == IMAGE_TLV_ENC_KW) {
-            *enc_kw_off = tlv_off + sizeof(tlv);
-            if (enc_kw_len) {
-                *enc_kw_len = tlv.it_len;
+        if (tlv.it_type == tlv_type) {
+            *tlv_off_out = tlv_off + sizeof(tlv);
+            if (tlv_len_out) {
+                *tlv_len_out = tlv.it_len;
             }
             return RSE_TLV_FOUND;
         }
