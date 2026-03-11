@@ -37,6 +37,9 @@
 #define MBIST_WAIT_CYCLES           10000000
 
 #define CL1_BOOT_WAIT_CYCLES        10000000
+#define RCC_DRAM_PRELOAD_HANDSHAKE_REG_ADDR  0xA0000400UL
+#define RCC_DRAM_PRELOAD_CMN_CFG_DONE_VAL    0x1UL
+#define RCC_DRAM_PRELOAD_ACK_VAL             0x11UL
 
 extern struct flash_area flash_map[];
 extern const int flash_map_entry_num;
@@ -294,7 +297,35 @@ static int boot_platform_finish(void)
         return 1;
     }
 
-    /*
+    /* RCC is a module with a list of registers used by FPGA flow to retrieve
+     * information from the running RTL. This handshake mechanism is implemented
+     * to let the flow know that CMN is configured so we can preload data
+     * targeting the DRAM region.
+     *
+     * Here we assume CMN configuration is completed by SI. There could be a
+     * better implementation in SCP-firmware where the handshake is done after
+     * CMN configuration is completed and before AP is turned ON.
+     *
+     * For SCP-firmware implementation use address 0x600000400 to access via
+     * SIEXP.
+     */
+#if (TFM_PLATFORM_VARIANT == CSS_ASPEN_VARIANT_RTL) && \
+    (TFM_RTL_VARIANT == CSS_ASPEN_RTL_VARIANT_FPGA)
+    {
+        uint32_t rd_val;
+
+        BOOT_LOG_INF("BL2: CMN configuration hand-shake");
+        *((volatile uint32_t *)RCC_DRAM_PRELOAD_HANDSHAKE_REG_ADDR) =
+            RCC_DRAM_PRELOAD_CMN_CFG_DONE_VAL;
+        
+        BOOT_LOG_INF("Waiting for RCC hand-shake completion");
+            do {
+            rd_val = *((volatile uint32_t *)RCC_DRAM_PRELOAD_HANDSHAKE_REG_ADDR);
+        } while (rd_val != RCC_DRAM_PRELOAD_ACK_VAL);
+    }
+#endif
+
+/*
      * Send SCMI command to SI CL0 to indicate that the RSE initialization is
      * complete and that the SCP-firmware can turn on the AP primary core.
      */
