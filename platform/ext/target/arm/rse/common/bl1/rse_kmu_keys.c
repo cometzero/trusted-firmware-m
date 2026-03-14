@@ -756,6 +756,21 @@ enum tfm_plat_err_t rse_setup_runtime_secure_image_encryption_key(void)
         return (enum tfm_plat_err_t) kmu_err;
     }
 
+#ifdef TFM_RUNTIME_DECRYPTION
+    /*
+     * Duplicate the same derived secure-encryption key into a runtime-readable
+     * slot for builtin KEK loading.
+     */
+    plat_err = setup_key_from_derivation(KMU_HW_SLOT_KCE_CM, NULL,
+                                         label, sizeof(label), NULL, 0,
+                                         RSE_KMU_SLOT_RUNTIME_KEK,
+                                         &aes_key0_export_config, NULL, false,
+                                         boot_state_config);
+    if (plat_err != TFM_PLAT_ERR_SUCCESS) {
+        return plat_err;
+    }
+#endif /* TFM_RUNTIME_DECRYPTION */
+
     return TFM_PLAT_ERR_SUCCESS;
 }
 

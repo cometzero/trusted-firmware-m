@@ -39,6 +39,9 @@ enum rse_kmu_slot_id_t {
     RSE_KMU_SLOT_CC3XX_PKA_SRAM_ENCRYPTION_KEY,
     RSE_KMU_SLOT_SECURE_SIC_ENCRYPTION_KEY,
     RSE_KMU_SLOT_NON_SECURE_SIC_ENCRYPTION_KEY,
+#ifdef TFM_RUNTIME_DECRYPTION
+    RSE_KMU_SLOT_RUNTIME_KEK,
+#endif /* TFM_RUNTIME_DECRYPTION */
     /* The minimum slot number for the session key. Given that we can
      * continuously re-key the session key, and each key needs to be
      * locked, we need to allocate multiple slots. Each individual session

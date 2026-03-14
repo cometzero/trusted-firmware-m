@@ -58,26 +58,22 @@ static enum tfm_plat_err_t tfm_plat_get_kek(const void *ctx,
                                      psa_algorithm_t *algorithm,
                                      psa_key_type_t *type)
 {
+    enum kmu_error_t kmu_err;
+
     if (buf_len < 32) {
         return TFM_PLAT_ERR_SYSTEM_ERR;
     }
-
-    /*
-     * This key is temporarily added until provision for getting the key from
-     * the key slot is in place
-     */
-    static uint8_t test_enc_key[ENC_KEY_LEN] = {
-        0x67, 0xdb, 0x6f, 0x5c, 0xc0, 0xb2, 0x92, 0xfc,
-        0x05, 0xfb, 0xcf, 0x50, 0x1e, 0xe5, 0x70, 0x0b,
-        0xd8, 0xd0, 0x82, 0xa0, 0x53, 0x94, 0xe2, 0x02,
-        0x74, 0x10, 0x37, 0x81, 0x4c, 0x79, 0xd6, 0xa8};
 
     *key_len = ENC_KEY_LEN;
     *key_bits = *key_len * 8;
     *type = PSA_KEY_TYPE_AES;
     *algorithm = PSA_ALG_ECB_NO_PADDING;
 
-    memcpy(buf, test_enc_key, ENC_KEY_LEN);
+    kmu_err = kmu_get_key(&KMU_DEV_S, RSE_KMU_SLOT_RUNTIME_KEK,
+                          buf, ENC_KEY_LEN);
+    if (kmu_err != KMU_ERROR_NONE) {
+        return TFM_PLAT_ERR_SYSTEM_ERR;
+    }
 
     return TFM_PLAT_ERR_SUCCESS;
 }
