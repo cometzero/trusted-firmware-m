@@ -11,7 +11,9 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../common common)
 target_compile_definitions(platform_common_interface
                            INTERFACE
                                CSS_ASPEN_VARIANT_FVP=0
-                               CSS_ASPEN_VARIANT_RTL=1)
+                               CSS_ASPEN_VARIANT_RTL=1
+                               CSS_ASPEN_RTL_VARIANT_FPGA=0
+                               CSS_ASPEN_RTL_VARIANT_EMU=1)
 
 if (TFM_PLATFORM_VARIANT STREQUAL "fvp")
       target_compile_definitions(platform_common_interface
@@ -19,6 +21,19 @@ if (TFM_PLATFORM_VARIANT STREQUAL "fvp")
 elseif (TFM_PLATFORM_VARIANT STREQUAL "rtl")
       target_compile_definitions(platform_common_interface
                                  INTERFACE TFM_PLATFORM_VARIANT=1)
+
+    if (NOT DEFINED TFM_RTL_VARIANT)
+        message(FATAL_ERROR "Please set TFM_RTL_VARIANT when TFM_PLATFORM_VARIANT is rtl\n")
+    elseif (TFM_RTL_VARIANT STREQUAL "fpga")
+        target_compile_definitions(platform_common_interface
+                                    INTERFACE TFM_RTL_VARIANT=CSS_ASPEN_RTL_VARIANT_FPGA)
+    elseif (TFM_RTL_VARIANT STREQUAL "emu")
+        target_compile_definitions(platform_common_interface
+                                    INTERFACE TFM_RTL_VARIANT=CSS_ASPEN_RTL_VARIANT_EMU)
+    else()
+        message(FATAL_ERROR "TFM_RTL_VARIANT must be set to either fpga or emu\n")
+    endif()
+    
 else()
       message(FATAL_ERROR "Please set TFM_PLATFORM_VARIANT\n")
 endif()

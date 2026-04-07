@@ -71,6 +71,16 @@
 /* Default RSE SYSCLK/CPU0CLK value in Hz */
 #define SYSCLK         100000000UL /* 100 MHz */
 
+/*
+ * Aspen RTL FPGA uses a lower peripheral clock than other Aspen variants.
+ * Override the common default for this target only.
+ */
+#if (TFM_PLATFORM_VARIANT == CSS_ASPEN_VARIANT_RTL) && \
+    (TFM_RTL_VARIANT == CSS_ASPEN_RTL_VARIANT_FPGA)
+#undef PERIPHERAL_CLOCK
+#define PERIPHERAL_CLOCK  (10000000UL) /* 10 MHz */
+#endif
+
 /* Clock configuration value to write to CLK_CFG1.SYSCLKCFG to drive SYSCLKCFG signal */
 #define SYSCLKCFG_VAL  0
 
