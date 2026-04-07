@@ -28,7 +28,10 @@
 /*----------------------------------------------------------------------------
   Define clocks
  *----------------------------------------------------------------------------*/
+/* Use target override if provided by platform-specific config. */
+#ifndef PERIPHERAL_CLOCK
 #define PERIPHERAL_CLOCK  (75000000UL)
+#endif
 
 /*----------------------------------------------------------------------------
   Exception / Interrupt Vector table
