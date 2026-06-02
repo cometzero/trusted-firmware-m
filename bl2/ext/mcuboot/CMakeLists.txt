@@ -255,7 +255,7 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
     set(wrapper_depends
         DEPENDS tfm_s_bin signing_layout_s
         DEPENDS $<IF:$<BOOL:${MCUBOOT_GENERATE_SIGNING_KEYPAIR}>,generated_private_key,>
-        DEPENDS $<$<BOOL:${MCUBOOT_ENC_IMAGES}>:${MCUBOOT_KEY_ENC_NS}>
+        DEPENDS $<$<BOOL:${MCUBOOT_ENC_IMAGES}>:${MCUBOOT_KEY_ENC}>
         WORKING_DIRECTORY ${MCUBOOT_PATH}/scripts
     )
 
