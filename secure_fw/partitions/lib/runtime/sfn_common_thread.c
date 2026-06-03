@@ -31,9 +31,13 @@ void common_sfn_thread(void *param)
     p_sfn_table = (service_fn_t *)meta->sfn_table;
     signal_mask = (1UL << meta->n_sfn) - 1;
 
-    if (sfn_init && (sfn_init(param) != PSA_SUCCESS)) {
-        ERROR_UNPRIV_RAW("Partition initialization FAILED in 0x%x\n", (uintptr_t)sfn_init);
-        psa_panic();
+    if (sfn_init) {
+        status = sfn_init(param);
+        if (status != PSA_SUCCESS) {
+            ERROR_UNPRIV_RAW("Partition initialization FAILED in 0x%x: %d\n",
+                             (uintptr_t)sfn_init, status);
+            psa_panic();
+        }
     }
 
     while (1) {

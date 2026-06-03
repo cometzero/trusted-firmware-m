@@ -15,6 +15,22 @@
 #include "qcbor/qcbor_encode.h"
 #include "qcbor/qcbor_spiffy_decode.h"
 
+#ifndef COSE_KEY_COMMON_KTY
+#define COSE_KEY_COMMON_KTY T_COSE_KEY_COMMON_KTY
+#endif
+#ifndef COSE_KEY_PARAM_CRV
+#define COSE_KEY_PARAM_CRV T_COSE_KEY_PARAM_CRV
+#endif
+#ifndef COSE_KEY_PARAM_X_COORDINATE
+#define COSE_KEY_PARAM_X_COORDINATE T_COSE_KEY_PARAM_X_COORDINATE
+#endif
+#ifndef COSE_KEY_PARAM_Y_COORDINATE
+#define COSE_KEY_PARAM_Y_COORDINATE T_COSE_KEY_PARAM_Y_COORDINATE
+#endif
+#ifndef COSE_KEY_TYPE_EC2
+#define COSE_KEY_TYPE_EC2 T_COSE_KEY_TYPE_EC2
+#endif
+
 
 enum t_cose_err_t
 t_cose_key_decode(struct q_useful_buf_c cbor_encoded,

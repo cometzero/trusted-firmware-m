@@ -109,6 +109,8 @@ list(APPEND BL2_CRYPTO_SRC
     $<$<AND:${is_ec_signature},${build_p256m}>:${MBEDCRYPTO_PATH}/3rdparty/p256-m/p256-m_driver_entrypoints.c>
     $<$<AND:${is_ec_signature},${build_p256m}>:${MBEDCRYPTO_PATH}/3rdparty/p256-m/p256-m/p256-m.c>
     ${MBEDCRYPTO_PATH}/library/aes.c
+    $<$<BOOL:${MCUBOOT_ENCRYPT_KW}>:${MBEDCRYPTO_PATH}/library/cipher.c>
+    $<$<BOOL:${MCUBOOT_ENCRYPT_KW}>:${MBEDCRYPTO_PATH}/library/cipher_wrap.c>
     $<$<BOOL:${MCUBOOT_ENCRYPT_KW}>:${MBEDCRYPTO_PATH}/library/nist_kw.c>
     $<$<BOOL:${MCUBOOT_ENCRYPT_KW}>:${MBEDCRYPTO_PATH}/library/constant_time.c>
 )
@@ -125,6 +127,14 @@ target_include_directories(bl2_crypto
     PUBLIC
         ${MBEDCRYPTO_PATH}/library
         ${CMAKE_CURRENT_SOURCE_DIR}/ext/mcuboot/include
+)
+
+set_source_files_properties(
+    ${MBEDCRYPTO_PATH}/library/cipher.c
+    ${MBEDCRYPTO_PATH}/library/cipher_wrap.c
+    ${MBEDCRYPTO_PATH}/library/nist_kw.c
+    PROPERTIES
+        COMPILE_OPTIONS "-iquote;${MBEDCRYPTO_PATH}/include"
 )
 
 target_compile_options(bl2_crypto

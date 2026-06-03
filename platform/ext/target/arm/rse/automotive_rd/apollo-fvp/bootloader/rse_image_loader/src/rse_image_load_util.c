@@ -56,7 +56,8 @@ extern int flash_area_driver_init(void);
 extern enum tfm_otp_element_id_t rse_cm_get_bl2_rotpk(uint32_t image_id);
 extern enum tfm_otp_element_id_t rse_dm_get_bl2_rotpk(uint32_t image_id);
 
-static uint8_t mbedtls_mem_buf[BL2_MBEDTLS_MEM_BUF_LEN];
+static uint8_t mbedtls_mem_buf[BL2_MBEDTLS_MEM_BUF_LEN]
+    __attribute__((aligned(8)));
 
 static void memclear_inbounds(void *base, size_t size_in_bytes)
 {
