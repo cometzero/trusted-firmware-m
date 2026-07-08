@@ -1,0 +1,53 @@
+From 5c63d9ac0dc34c6508b4fd29d6abf7a8ac56e1a2 Mon Sep 17 00:00:00 2001
+From: Chanho Park <parkch98@gmail.com>
+Date: Thu, 4 Jun 2026 05:25:00 +0900
+Subject: [PATCH 14/14] Align memory buffer allocator for Cortex-M
+
+GCC can emit STRD when storing adjacent fields in the static Mbed TLS
+memory buffer allocator context. On Cortex-M this can raise an
+unaligned UsageFault if the object is only word aligned and the linker
+places it at an address that is not double-word aligned.
+
+The allocator can also return 4-byte aligned blocks when the default
+alignment multiple is 4. Code using the allocated cipher contexts may
+then trigger the same class of fault.
+
+Align the allocator context and allocation multiple to 8 bytes so BL2
+image validation does not HardFault while using the temporary RAM-load
+heap.
+
+Signed-off-by: Chanho Park <parkch98@gmail.com>
+---
+ include/mbedtls/memory_buffer_alloc.h | 2 +-
+ library/memory_buffer_alloc.c         | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/mbedtls/memory_buffer_alloc.h b/include/mbedtls/memory_buffer_alloc.h
+index 870d605f41..14f943d69b 100644
+--- a/include/mbedtls/memory_buffer_alloc.h
++++ b/include/mbedtls/memory_buffer_alloc.h
+@@ -23,7 +23,7 @@
+  */
+ 
+ #if !defined(MBEDTLS_MEMORY_ALIGN_MULTIPLE)
+-#define MBEDTLS_MEMORY_ALIGN_MULTIPLE       4 /**< Align on multiples of this value */
++#define MBEDTLS_MEMORY_ALIGN_MULTIPLE       8 /**< Align on multiples of this value */
+ #endif
+ 
+ /** \} name SECTION: Module settings */
+
+diff --git a/library/memory_buffer_alloc.c b/library/memory_buffer_alloc.c
+index 928c5fcb8c..31f68191d8 100644
+--- a/library/memory_buffer_alloc.c
++++ b/library/memory_buffer_alloc.c
+@@ -65,7 +65,7 @@ typedef struct
+ }
+ buffer_alloc_ctx;
+ 
+-static buffer_alloc_ctx heap;
++static buffer_alloc_ctx heap __attribute__((aligned(8)));
+ 
+ #if defined(MBEDTLS_MEMORY_DEBUG)
+ static void debug_header(memory_header *hdr)
+-- 
+2.34.1

@@ -61,7 +61,8 @@ __asm("  .global __ARM_use_no_argv\n");
 #endif
 
 /* Static buffer to be used by mbedtls for memory allocation */
-static uint8_t mbedtls_mem_buf[BL2_MBEDTLS_MEM_BUF_LEN];
+static uint8_t mbedtls_mem_buf[BL2_MBEDTLS_MEM_BUF_LEN]
+    __attribute__((aligned(8)));
 struct boot_rsp rsp;
 
 static void do_boot(struct boot_rsp *rsp)
