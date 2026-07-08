@@ -36,11 +36,61 @@
 #include "mbedtls/nist_kw.h"
 #if defined(CC3XX_CRYPTO_OPAQUE_KEYS)
 #include "cc3xx_opaque_keys.h"
+#include "cc3xx.h"
+#endif
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+#include "cc3xx_psa_hash.h"
 #endif
 
 #ifndef FATAL_ERR
 #define FATAL_ERR(x)
 #endif /* FATAL_ERR */
+
+#if defined(CC3XX_CRYPTO_OPAQUE_KEYS) && defined(PSA_CRYPTO_DRIVER_CC3XX)
+#define TFM_BL1_CC3XX_AEAD_DRIVER_ID (5U)
+
+static psa_status_t tfm_bl1_cc3xx_aead_setup(psa_aead_operation_t *operation,
+                                             psa_key_id_t key_id,
+                                             psa_algorithm_t alg,
+                                             bool encrypt)
+{
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    const uint8_t *key_buffer;
+    size_t key_buffer_size;
+    psa_status_t status;
+
+    status = cc3xx_opaque_keys_attr_init(&attributes, key_id, alg,
+                                         &key_buffer, &key_buffer_size);
+    if (status != PSA_SUCCESS) {
+        return status;
+    }
+
+    if (encrypt) {
+        status = cc3xx_aead_encrypt_setup(&operation->ctx.cc3xx_driver_ctx,
+                                          &attributes, key_buffer,
+                                          key_buffer_size, alg);
+    } else {
+        status = cc3xx_aead_decrypt_setup(&operation->ctx.cc3xx_driver_ctx,
+                                          &attributes, key_buffer,
+                                          key_buffer_size, alg);
+    }
+
+    if (status != PSA_SUCCESS) {
+        return status;
+    }
+
+    operation->id = TFM_BL1_CC3XX_AEAD_DRIVER_ID;
+    operation->alg = alg;
+    operation->key_type = psa_get_key_type(&attributes);
+    operation->is_encrypt = encrypt ? 1U : 0U;
+
+    return PSA_SUCCESS;
+}
+#endif
+
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+#define TFM_BL1_CC3XX_HASH_DRIVER_ID (5U)
+#endif
 
 /**
  * \brief Rounds a value x up to a bound.
@@ -338,6 +388,21 @@ EXTERNAL_PSA_API(psa_hash_compute,
     assert(hash_size != 0);
     assert(hash_length != NULL);
 
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+    status = cc3xx_hash_compute(alg,
+                                 input,
+                                 input_length,
+                                 hash,
+                                 hash_size,
+                                 hash_length);
+    if (status != PSA_ERROR_NOT_SUPPORTED) {
+        if (status != PSA_SUCCESS) {
+            FATAL_ERR(status);
+        }
+        FIH_RET(status);
+    }
+#endif
+
     status = psa_driver_wrapper_hash_compute(alg,
                                              input,
                                              input_length,
@@ -364,6 +429,17 @@ EXTERNAL_PSA_API(psa_hash_abort,
         FIH_RET(PSA_SUCCESS);
     }
 
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_HASH_DRIVER_ID) {
+        status = cc3xx_hash_abort(&operation->ctx.cc3xx_driver_ctx);
+        operation->id = 0;
+        if (status != PSA_SUCCESS) {
+            FATAL_ERR(status);
+        }
+        FIH_RET(status);
+    }
+#endif
+
     status = psa_driver_wrapper_hash_abort(operation);
     operation->id = 0;
     if (status != PSA_SUCCESS) {
@@ -388,6 +464,18 @@ EXTERNAL_PSA_API(psa_hash_setup,
      * directly zeroes the int-sized dummy member of the context union.
      */
     memset(&operation->ctx, 0, sizeof(operation->ctx));
+
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+    status = cc3xx_hash_setup(&operation->ctx.cc3xx_driver_ctx, alg);
+    if (status == PSA_SUCCESS) {
+        operation->id = TFM_BL1_CC3XX_HASH_DRIVER_ID;
+        FIH_RET(status);
+    }
+    if (status != PSA_ERROR_NOT_SUPPORTED) {
+        FATAL_ERR(status);
+        FIH_RET(status);
+    }
+#endif
 
     status = psa_driver_wrapper_hash_setup(operation, alg);
     if (status != PSA_SUCCESS) {
@@ -415,6 +503,18 @@ EXTERNAL_PSA_API(psa_hash_update,
 
     assert(input != NULL);
 
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_HASH_DRIVER_ID) {
+        status = cc3xx_hash_update(&operation->ctx.cc3xx_driver_ctx,
+                                   input,
+                                   input_length);
+        if (status != PSA_SUCCESS) {
+            FATAL_ERR(status);
+        }
+        FIH_RET(status);
+    }
+#endif
+
     status = psa_driver_wrapper_hash_update(operation, input, input_length);
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
@@ -435,6 +535,20 @@ EXTERNAL_PSA_API(psa_hash_finish,
     assert(operation->id != 0);
     assert(hash != NULL);
     assert(hash_length != NULL);
+
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_HASH_DRIVER_ID) {
+        status = cc3xx_hash_finish(&operation->ctx.cc3xx_driver_ctx,
+                                   hash,
+                                   hash_size,
+                                   hash_length);
+        (void)psa_hash_abort(operation);
+        if (status != PSA_SUCCESS) {
+            FATAL_ERR(status);
+        }
+        FIH_RET(status);
+    }
+#endif
 
     status = psa_driver_wrapper_hash_finish(operation, hash, hash_size, hash_length);
     (void)psa_hash_abort(operation);
@@ -909,6 +1023,10 @@ psa_status_t psa_import_key(const psa_key_attributes_t *attributes,
 #endif
 
     if (PSA_KEY_TYPE_IS_UNSTRUCTURED(psa_get_key_type(attributes))) {
+        bits = PSA_BYTES_TO_BITS(data_length);
+    }
+
+    if (psa_get_key_type(attributes) == PSA_KEY_TYPE_AES) {
         bits = PSA_BYTES_TO_BITS(data_length);
     }
 
@@ -1475,13 +1593,17 @@ EXTERNAL_PSA_API(psa_aead_encrypt_setup,
         (psa_aead_operation_t *operation, psa_key_id_t key_id, psa_algorithm_t alg),
         operation, key_id, alg)
 {
+    psa_status_t status;
+
     assert(operation != NULL);
 
 #ifdef CC3XX_CRYPTO_OPAQUE_KEYS
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+    status = tfm_bl1_cc3xx_aead_setup(operation, key_id, alg, true);
+#else
     psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
     const uint8_t *key_buffer;
     size_t key_buffer_size;
-    psa_status_t status;
 
     status = cc3xx_opaque_keys_attr_init(&attributes, key_id, alg,
                                          &key_buffer, &key_buffer_size);
@@ -1494,6 +1616,7 @@ EXTERNAL_PSA_API(psa_aead_encrypt_setup,
                                                    key_buffer,
                                                    key_buffer_size,
                                                    alg);
+#endif
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
         FIH_RET(status);
@@ -1511,13 +1634,17 @@ EXTERNAL_PSA_API(psa_aead_decrypt_setup,
         (psa_aead_operation_t *operation, psa_key_id_t key_id, psa_algorithm_t alg),
         operation, key_id, alg)
 {
+    psa_status_t status;
+
     assert(operation != NULL);
 
 #ifdef CC3XX_CRYPTO_OPAQUE_KEYS
+#if defined(PSA_CRYPTO_DRIVER_CC3XX)
+    status = tfm_bl1_cc3xx_aead_setup(operation, key_id, alg, false);
+#else
     psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
     const uint8_t *key_buffer;
     size_t key_buffer_size;
-    psa_status_t status;
 
     status = cc3xx_opaque_keys_attr_init(&attributes, key_id, alg,
                                          &key_buffer, &key_buffer_size);
@@ -1530,6 +1657,7 @@ EXTERNAL_PSA_API(psa_aead_decrypt_setup,
                                                    key_buffer,
                                                    key_buffer_size,
                                                    alg);
+#endif
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
         FIH_RET(status);
@@ -1554,9 +1682,17 @@ EXTERNAL_PSA_API(psa_aead_set_nonce,
     assert(nonce != NULL);
     assert(nonce_length != 0);
 
-    status = psa_driver_wrapper_aead_set_nonce(operation,
-                                               nonce,
-                                               nonce_length);
+#if defined(CC3XX_CRYPTO_OPAQUE_KEYS) && defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_AEAD_DRIVER_ID) {
+        status = cc3xx_aead_set_nonce(&operation->ctx.cc3xx_driver_ctx,
+                                      nonce, nonce_length);
+    } else
+#endif
+    {
+        status = psa_driver_wrapper_aead_set_nonce(operation,
+                                                   nonce,
+                                                   nonce_length);
+    }
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
         FIH_RET(status);
@@ -1575,9 +1711,17 @@ EXTERNAL_PSA_API(psa_aead_set_lengths,
     assert(operation != NULL);
     assert(operation->id != 0);
 
-    status = psa_driver_wrapper_aead_set_lengths(operation,
-                                                 ad_length,
-                                                 plaintext_length);
+#if defined(CC3XX_CRYPTO_OPAQUE_KEYS) && defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_AEAD_DRIVER_ID) {
+        status = cc3xx_aead_set_lengths(&operation->ctx.cc3xx_driver_ctx,
+                                        ad_length, plaintext_length);
+    } else
+#endif
+    {
+        status = psa_driver_wrapper_aead_set_lengths(operation,
+                                                     ad_length,
+                                                     plaintext_length);
+    }
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
         FIH_RET(status);
@@ -1597,9 +1741,17 @@ EXTERNAL_PSA_API(psa_aead_update_ad,
     assert(operation->id != 0);
     assert((!input_length) ^ (input != NULL));
 
-    status = psa_driver_wrapper_aead_update_ad(operation,
-                                               input,
-                                               input_length);
+#if defined(CC3XX_CRYPTO_OPAQUE_KEYS) && defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_AEAD_DRIVER_ID) {
+        status = cc3xx_aead_update_ad(&operation->ctx.cc3xx_driver_ctx,
+                                      input, input_length);
+    } else
+#endif
+    {
+        status = psa_driver_wrapper_aead_update_ad(operation,
+                                                   input,
+                                                   input_length);
+    }
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
         FIH_RET(status);
@@ -1621,12 +1773,21 @@ EXTERNAL_PSA_API(psa_aead_update,
     assert((!input_length) ^ (input != NULL));
     assert((!output_size) ^ (output != NULL));
 
-    status = psa_driver_wrapper_aead_update(operation,
-                                            input,
-                                            input_length,
-                                            output,
-                                            output_size,
-                                            output_length);
+#if defined(CC3XX_CRYPTO_OPAQUE_KEYS) && defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_AEAD_DRIVER_ID) {
+        status = cc3xx_aead_update(&operation->ctx.cc3xx_driver_ctx,
+                                   input, input_length, output, output_size,
+                                   output_length);
+    } else
+#endif
+    {
+        status = psa_driver_wrapper_aead_update(operation,
+                                                input,
+                                                input_length,
+                                                output,
+                                                output_size,
+                                                output_length);
+    }
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
         FIH_RET(status);
@@ -1650,13 +1811,23 @@ EXTERNAL_PSA_API(psa_aead_finish,
     assert(tag != NULL);
     assert(tag_length != NULL);
 
-    status = psa_driver_wrapper_aead_finish(operation,
-                                            ciphertext,
-                                            ciphertext_size,
-                                            ciphertext_length,
-                                            tag,
-                                            tag_size,
-                                            tag_length);
+#if defined(CC3XX_CRYPTO_OPAQUE_KEYS) && defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_AEAD_DRIVER_ID) {
+        status = cc3xx_aead_finish(&operation->ctx.cc3xx_driver_ctx,
+                                   ciphertext, ciphertext_size,
+                                   ciphertext_length, tag, tag_size,
+                                   tag_length);
+    } else
+#endif
+    {
+        status = psa_driver_wrapper_aead_finish(operation,
+                                                ciphertext,
+                                                ciphertext_size,
+                                                ciphertext_length,
+                                                tag,
+                                                tag_size,
+                                                tag_length);
+    }
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
         FIH_RET(status);
@@ -1680,12 +1851,21 @@ EXTERNAL_PSA_API(psa_aead_verify,
     assert(tag != NULL);
     assert(tag_length != 0);
 
-    status = psa_driver_wrapper_aead_verify(operation,
-                                            plaintext,
-                                            plaintext_size,
-                                            plaintext_length,
-                                            tag,
-                                            tag_length);
+#if defined(CC3XX_CRYPTO_OPAQUE_KEYS) && defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_AEAD_DRIVER_ID) {
+        status = cc3xx_aead_verify(&operation->ctx.cc3xx_driver_ctx,
+                                   plaintext, plaintext_size,
+                                   plaintext_length, tag, tag_length);
+    } else
+#endif
+    {
+        status = psa_driver_wrapper_aead_verify(operation,
+                                                plaintext,
+                                                plaintext_size,
+                                                plaintext_length,
+                                                tag,
+                                                tag_length);
+    }
     if ((status != PSA_SUCCESS) &&
         (status != PSA_ERROR_INVALID_SIGNATURE)) {
             FATAL_ERR(status);
@@ -1703,7 +1883,17 @@ EXTERNAL_PSA_API(psa_aead_abort,
     assert(operation != NULL);
     assert(operation->id != 0);
 
-    status = psa_driver_wrapper_aead_abort(operation);
+#if defined(CC3XX_CRYPTO_OPAQUE_KEYS) && defined(PSA_CRYPTO_DRIVER_CC3XX)
+    if (operation->id == TFM_BL1_CC3XX_AEAD_DRIVER_ID) {
+        status = cc3xx_aead_abort(&operation->ctx.cc3xx_driver_ctx);
+        if (status == PSA_SUCCESS) {
+            operation->id = 0;
+        }
+    } else
+#endif
+    {
+        status = psa_driver_wrapper_aead_abort(operation);
+    }
     if (status != PSA_SUCCESS) {
         FATAL_ERR(status);
         FIH_RET(status);

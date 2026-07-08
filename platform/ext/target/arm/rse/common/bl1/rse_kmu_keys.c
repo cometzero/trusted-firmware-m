@@ -171,8 +171,8 @@ enum tfm_plat_err_t setup_key_from_derivation(enum kmu_hardware_keyslot_t input_
     size_t kmu_slot_size;
     uint8_t *context_ptr =  NULL;
     size_t context_ptr_len = 0;
-    psa_key_id_t psa_key_id;
-    psa_status_t status;
+    cc3xx_aes_key_id_t cc3xx_key_id;
+    cc3xx_err_t cc_err;
 
     if (context != NULL && mask != RSE_BOOT_STATE_INCLUDE_NONE) {
         return TFM_PLAT_ERR_KEY_DERIVATION_INVALID_BOOT_STATE_WITH_CONTEXT;
@@ -199,36 +199,15 @@ enum tfm_plat_err_t setup_key_from_derivation(enum kmu_hardware_keyslot_t input_
         return TFM_PLAT_ERR_KEY_DERIVATION_DERIVATION_SLOT_TOO_SMALL;
     }
 
-    if (key_buf != 0) {
-        psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
-
-        psa_set_key_type(&key_attr, PSA_KEY_TYPE_AES);
-        psa_set_key_bits(&key_attr, key_size * 8);
-        psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_DERIVE);
-        psa_set_key_lifetime(&key_attr, PSA_KEY_LIFETIME_VOLATILE);
-        status = psa_import_key(&key_attr, (uint8_t*)key_buf, key_size, &psa_key_id);
-        if (status != PSA_SUCCESS) {
-            return (enum tfm_plat_err_t)status;
-        }
-    } else {
-        psa_key_id = cc3xx_get_opaque_key(input_key_id);
-        if (CC3XX_IS_OPAQUE_KEY_INVALID(psa_key_id)) {
-            return (enum tfm_plat_err_t)PSA_ERROR_INVALID_ARGUMENT;
-        }
-    }
-
-    status = bl1_psa_derive_key(psa_key_id, label, label_len,
-                                context_ptr, context_ptr_len,
-                                (uint8_t*)p_kmu_slot_buf, key_size);
-    if (status != PSA_SUCCESS) {
-        return (enum tfm_plat_err_t)status;
-    }
-
-    if (key_buf != 0) {
-        status = psa_destroy_key(psa_key_id);
-        if (status != PSA_SUCCESS) {
-            return (enum tfm_plat_err_t)status;
-        }
+    cc3xx_key_id = (key_buf != NULL) ? CC3XX_AES_KEY_ID_USER_KEY :
+                                      (cc3xx_aes_key_id_t)input_key_id;
+    cc_err = cc3xx_lowlevel_kdf_cmac(cc3xx_key_id, key_buf,
+                                     CC3XX_AES_KEYSIZE_256,
+                                     label, label_len,
+                                     context_ptr, context_ptr_len,
+                                     (uint32_t *)p_kmu_slot_buf, key_size);
+    if (cc_err != CC3XX_ERR_SUCCESS) {
+        return (enum tfm_plat_err_t)cc_err;
     }
 
     /* Due to limitations in CryptoCell, any key that needs to be used for
@@ -471,22 +450,18 @@ enum tfm_plat_err_t rse_derive_vhuk_seed(uint32_t *vhuk_seed, size_t vhuk_seed_b
                          size_t *vhuk_seed_size)
 {
     const uint8_t vhuk_seed_label[]  = "VHUK_SEED_DERIVATION";
-    psa_status_t status;
-    psa_key_id_t psa_key_id;
+    cc3xx_err_t cc_err;
 
     if (vhuk_seed_buf_len < 32) {
         return 1;
     }
 
-    psa_key_id = cc3xx_get_opaque_key(KMU_HW_SLOT_HUK);
-    if (CC3XX_IS_OPAQUE_KEY_INVALID(psa_key_id)) {
-        return (enum tfm_plat_err_t)PSA_ERROR_INVALID_ARGUMENT;
-    }
-
-    status = bl1_psa_derive_key(psa_key_id, vhuk_seed_label, sizeof(vhuk_seed_label),
-                                NULL, 0, (uint8_t*)vhuk_seed, 32);
-    if (status != PSA_SUCCESS) {
-        return (enum tfm_plat_err_t)status;
+    cc_err = cc3xx_lowlevel_kdf_cmac((cc3xx_aes_key_id_t)KMU_HW_SLOT_HUK, NULL,
+                                     CC3XX_AES_KEYSIZE_256,
+                                     vhuk_seed_label, sizeof(vhuk_seed_label),
+                                     NULL, 0, vhuk_seed, 32);
+    if (cc_err != CC3XX_ERR_SUCCESS) {
+        return (enum tfm_plat_err_t)cc_err;
     }
 
     *vhuk_seed_size = 32;
