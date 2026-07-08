@@ -235,6 +235,8 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
             DEPENDS tfm_s_signed_bin
     )
 
+    get_target_property(bin_dir bl2 RUNTIME_OUTPUT_DIRECTORY)
+
     set(wrapper_args
         --layout $<TARGET_OBJECTS:signing_layout_s>
         -k ${MCUBOOT_KEY_S}
@@ -254,6 +256,7 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
 
     set(wrapper_depends
         DEPENDS tfm_s_bin signing_layout_s
+        DEPENDS ${bin_dir}/tfm_s.bin
         DEPENDS $<IF:$<BOOL:${MCUBOOT_GENERATE_SIGNING_KEYPAIR}>,generated_private_key,>
         DEPENDS $<$<BOOL:${MCUBOOT_ENC_IMAGES}>:${MCUBOOT_KEY_ENC}>
         WORKING_DIRECTORY ${MCUBOOT_PATH}/scripts
@@ -269,8 +272,6 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
     if(MCUBOOT_IMAGE_MULTI_SIG_SUPPORT)
         set(wrapper_args ${wrapper_args} -k ${MCUBOOT_KEY_NS})
     endif()
-
-    get_target_property(bin_dir bl2 RUNTIME_OUTPUT_DIRECTORY)
 
     add_custom_command(OUTPUT tfm_s_signed.bin
         OUTPUT ${bin_dir}/tfm_s_signed.bin

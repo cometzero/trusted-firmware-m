@@ -638,6 +638,7 @@ endif()
 
 if (RSE_USE_ROM_LIB_FROM_SRAM)
     add_custom_target(bl1_1_shared_symbols_in_sram
+        BYPRODUCTS ${CMAKE_BINARY_DIR}/bin/bl1_1${CODE_SHARING_INPUT_FILE_SUFFIX}
         COMMAND ${CMAKE_OBJCOPY}
             ${CMAKE_BINARY_DIR}/bin/bl1_1${CODE_SHARING_OUTPUT_FILE_SUFFIX}
             --change-section-address .text\*${RSE_ROM_LIB_RELOCATION_OFFSET}

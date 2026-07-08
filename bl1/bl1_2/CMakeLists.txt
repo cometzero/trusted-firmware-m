@@ -180,6 +180,7 @@ set(signing_depends
     DEPENDS $<$<BOOL:${TFM_GENERATE_BL1_2_CM_SIGNING_KEY}>:bl1_generated_cm_signing_key>
     DEPENDS $<$<AND:$<EQUAL:${TFM_BL1_2_SIGNER_AMOUNT},2>,$<BOOL:${TFM_GENERATE_BL1_2_DM_SIGNING_KEY}>>:bl1_generated_dm_signing_key>
     DEPENDS bl2_bin
+    DEPENDS ${bin_dir}/bl2.bin
 )
 
 add_custom_command(OUTPUT bl2_signed.bin

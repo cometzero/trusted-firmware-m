@@ -233,13 +233,15 @@ macro(target_share_symbols target)
     )
 
     list(TRANSFORM STRIP_SYMBOL_KEEP_LIST PREPEND  --keep-symbol=)
+    get_target_property(bin_dir ${target} RUNTIME_OUTPUT_DIRECTORY)
     # strip all the symbols except those proveded as arguments
     add_custom_target(${target}_shared_symbols
+        BYPRODUCTS ${bin_dir}/${target}${CODE_SHARING_OUTPUT_FILE_SUFFIX}
         COMMAND ${CMAKE_OBJCOPY}
             $<TARGET_FILE:${target}>
             --wildcard ${STRIP_SYMBOL_KEEP_LIST}
             --strip-all
-            $<TARGET_FILE_DIR:${target}>/${target}${CODE_SHARING_OUTPUT_FILE_SUFFIX}
+            ${bin_dir}/${target}${CODE_SHARING_OUTPUT_FILE_SUFFIX}
     )
 
     # Ensure ${target} is built before $<TARGET_FILE:${target}> is used to generate ${target}_shared_symbols
@@ -264,6 +266,7 @@ macro(target_link_shared_code target)
         # ${symbol_provider}_shared_symbols - a custom target is always considered out-of-date
         # To only link when necessary, depend on ${symbol_provider} instead
         set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS $<TARGET_OBJECTS:${symbol_provider}>)
+        set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS $<TARGET_FILE_DIR:${symbol_provider}>/${symbol_provider}${CODE_SHARING_INPUT_FILE_SUFFIX})
         target_link_options(${target} PRIVATE LINKER:--just-symbols $<TARGET_FILE_DIR:${symbol_provider}>/${symbol_provider}${CODE_SHARING_INPUT_FILE_SUFFIX})
     endforeach()
 endmacro()
