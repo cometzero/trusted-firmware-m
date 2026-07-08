@@ -1,0 +1,1163 @@
+/*
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: Copyright The TrustedFirmware-M Contributors
+ */
+
+#include "atu_config.h"
+#include "atu_rse_lib.h"
+#include "bl2_image_id.h"
+#include "boot_hal.h"
+#include "tfm_plat_boot_measurement.h"
+#include "bootutil/bootutil_log.h"
+#include "crypto_hw.h"
+#include "device_definition.h"
+#include "fih.h"
+#include "fip_parser.h"
+#include "fwu_hal_bl2.h"
+#include "flash_layout.h"
+#include "flash_map/flash_map.h"
+#include "host_base_address.h"
+#include "mhu_v3_x.h"
+#include "platform_base_address.h"
+#include "platform_regs.h"
+#include "rse_expansion_regs.h"
+#include "scmi_comms.h"
+#include "scmi_hal.h"
+#include "scmi_power_domain.h"
+#include "systop_pik.h"
+#include "tfm_boot_status.h"
+#include "tfm_plat_defs.h"
+
+#include <string.h>
+
+#define SCMI_BUSY_WAIT_CYCLES       10000000
+#define MAX_RETRIES_PROTOCOL_VER    3
+
+#define LBIST_WAIT_CYCLES           12500000
+#define MBIST_WAIT_CYCLES           10000000
+
+#define CL1_BOOT_WAIT_CYCLES        10000000
+#define RCC_DRAM_PRELOAD_HANDSHAKE_REG_ADDR  0xA0000400UL
+#define RCC_DRAM_PRELOAD_CMN_CFG_DONE_VAL    0x1UL
+#define RCC_DRAM_PRELOAD_ACK_VAL             0x11UL
+
+extern struct flash_area flash_map[];
+extern const int flash_map_entry_num;
+extern ARM_DRIVER_FLASH AP_FLASH_DEV_NAME;
+
+static int32_t fill_secure_flash_map_with_data(void)
+{
+    uint64_t ap_bl2_offset = 0;
+    size_t ap_bl2_size = 0;
+    enum tfm_plat_err_t result;
+    uint8_t i, id, primary_flash_id, secondary_flash_id;
+    uint32_t ap_image_offset;
+    uint8_t boot_index;
+
+    boot_index = get_active_boot_index();
+
+    if (boot_index == FWU_BANK_0) {
+        /* Set flash_map[] of AP BL2 both slot offsets to Primary Slot offset */
+        ap_image_offset = AP_FLASH_AREA_0_OFFSET;
+    } else {
+        /* Set flash_map[] of AP BL2 both slot offsets to Secondary Slot offset */
+        ap_image_offset = AP_FLASH_AREA_1_OFFSET;
+    }
+
+    result = fip_get_entry_by_uuid(&AP_FLASH_DEV_NAME,
+                                   ap_image_offset, AP_FLASH_FIP_SIZE,
+                                   UUID_TRUSTED_BOOT_FIRMWARE_BL2,
+                                   &ap_bl2_offset, &ap_bl2_size);
+    if (result != TFM_PLAT_ERR_SUCCESS) {
+        return 1;
+    }
+
+    primary_flash_id = FLASH_AREA_IMAGE_PRIMARY(RSE_FIRMWARE_AP_BL2_ID);
+    secondary_flash_id = FLASH_AREA_IMAGE_SECONDARY(RSE_FIRMWARE_AP_BL2_ID);
+
+    for (i = 0; i < flash_map_entry_num; i++) {
+        id = flash_map[i].fa_id;
+
+        if ((id == primary_flash_id) || (id == secondary_flash_id)) {
+            flash_map[i].fa_off = ap_image_offset + ap_bl2_offset;
+            flash_map[i].fa_size = ap_bl2_size;
+        }
+    }
+
+    return 0;
+}
+
+static void clear_safety_island_memory(const struct scr_dev_t *scr_dev)
+{
+    volatile scr_t *scr = (volatile scr_t *)scr_dev->scr_base;
+
+    const uint32_t memprot_mask = (1U << MEMPROTCTLR_LM0_MEMPROTEN_BIT) |
+                                  (1U << MEMPROTCTLR_SH1_MEMPROTEN_BIT);
+
+    /* Turn off Memory protection control */
+    scr->memprotctlr &= ~memprot_mask;
+
+    /*
+     * Initialize LM0 contents, by writing a constant 0 value to the whole space
+     * where the boot image(s) will occupy in the future.
+     */
+    memset((void *)HOST_SI_CL0_IMG_CODE_BASE_S, 0, SIZE_DEF_SI_CL0_IMAGE);
+
+    /*
+     * Initialize SH1 contents, by writing a constant 0 value to the whole space
+     * where the RSE CL0 MHU payloads will occupy in the future.
+     */
+    memset((void *)HOST_RSE_SI_SSRAM_ATU_BASE_S, 0, HOST_RSE_SI_SSRAM_ATU_SIZE);
+
+    /* Turn on Memory protection control */
+    scr->memprotctlr |= memprot_mask;
+}
+
+#if defined(TFM_MEASURED_BOOT_API) || defined(TFM_PARTITION_FIRMWARE_UPDATE)
+
+int boot_add_data_to_shared_area(uint8_t major_type,
+                                 uint16_t minor_type,
+                                 size_t size,
+                                 const uint8_t *data)
+{
+    struct shared_data_tlv_entry tlv_entry = {0};
+    struct tfm_boot_data *boot_data;
+    uintptr_t tlv_end, offset;
+    const uintptr_t data_base = tfm_plat_get_shared_measurement_data_base();
+    const size_t data_size = tfm_plat_get_shared_measurement_data_size();
+
+    if (data == NULL) {
+        return -1;
+    }
+
+    boot_data = (struct tfm_boot_data *)data_base;
+
+    /* Check whether the shared area needs to be initialized. */
+    if ((boot_data->header.tlv_magic != SHARED_DATA_TLV_INFO_MAGIC) ||
+        (boot_data->header.tlv_tot_len > data_size)) {
+        memset((void *)data_base, 0, data_size);
+        boot_data->header.tlv_magic   = SHARED_DATA_TLV_INFO_MAGIC;
+        boot_data->header.tlv_tot_len = data_size;
+    }
+
+    /* Get the boundaries of TLV section. */
+    tlv_end = data_base + boot_data->header.tlv_tot_len;
+    offset = data_base + data_size;
+
+    /* Check whether TLV entry is already added. Iterates over the TLV section
+     * looks for the same entry if found then returns with error.
+     */
+    while (offset < tlv_end) {
+        /* Create local copy to avoid unaligned access */
+        memcpy(&tlv_entry, (const void *)offset, SHARED_DATA_ENTRY_HEADER_SIZE);
+        if (GET_MAJOR(tlv_entry.tlv_type) == major_type &&
+            GET_MINOR(tlv_entry.tlv_type) == minor_type) {
+            return -1;
+        }
+
+        offset += SHARED_DATA_ENTRY_SIZE(tlv_entry.tlv_len);
+    }
+
+    /* Add TLV entry. */
+    tlv_entry.tlv_type = SET_TLV_TYPE(major_type, minor_type);
+    tlv_entry.tlv_len  = size;
+
+    /* Check integer overflow and overflow of shared data area. */
+    if (SHARED_DATA_ENTRY_SIZE(size) >
+        (UINT16_MAX - boot_data->header.tlv_tot_len)) {
+        return -1;
+    } else if ((SHARED_DATA_ENTRY_SIZE(size) + boot_data->header.tlv_tot_len) > data_size) {
+        return -1;
+    }
+
+    offset = tlv_end;
+    memcpy((void *)offset, &tlv_entry, SHARED_DATA_ENTRY_HEADER_SIZE);
+
+    offset += SHARED_DATA_ENTRY_HEADER_SIZE;
+    memcpy((void *)offset, data, size);
+
+    boot_data->header.tlv_tot_len += SHARED_DATA_ENTRY_SIZE(size);
+
+    return 0;
+}
+
+#endif /* TFM_MEASURED_BOOT_API || TFM_PARTITION_FIRMWARE_UPDATE */
+
+#ifdef TFM_MEASURED_BOOT_API
+/*
+ * Store a boot measurement in shared memory.
+ *
+ * On CSS-Aspen we use separate slots for each measurement hash and do not
+ * support live firmware upgrades. Hence, we lock each slot after a measurement
+ * has been stored once.
+ */
+int boot_store_measurement(uint8_t index,
+                           const uint8_t *measurement,
+                           size_t measurement_size,
+                           const struct boot_measurement_metadata *metadata,
+                           bool lock_measurement)
+{
+    uint16_t minor_type;
+    int rc;
+    /* Ignore input request */
+    (void)lock_measurement;
+
+    if (index >= BOOT_MEASUREMENT_SLOT_MAX) {
+        return -1;
+    }
+
+    minor_type = SET_MBS_MINOR(index, SW_MEASURE_METADATA);
+    rc = boot_add_data_to_shared_area(TLV_MAJOR_MBS,
+                                      minor_type,
+                                      sizeof(struct boot_measurement_metadata),
+                                      (const uint8_t *)metadata);
+    if (rc) {
+        return rc;
+    }
+
+    minor_type = SET_MBS_MINOR(index, SW_MEASURE_VALUE_NON_EXTENDABLE);
+    rc = boot_add_data_to_shared_area(TLV_MAJOR_MBS,
+                                      minor_type,
+                                      measurement_size,
+                                      measurement);
+
+    return rc;
+}
+
+#endif /* TFM_MEASURED_BOOT_API */
+
+/*
+ * ============================ INIT FUNCTIONS =================================
+ */
+
+int32_t boot_platform_post_init(void)
+{
+    enum atu_error_t atu_err;
+    int32_t result;
+
+    struct rse_integ_t *integ_layer =
+        (struct rse_integ_t *)RSE_INTEG_LAYER_BASE_S;
+
+    /* Set the RSE to use the system PLL with 1/1 clock division */
+    integ_layer->rsecoreclk_ctrl = RSE_INTEG_CLKCTRL_SEL_SPLL;
+    integ_layer->rsecoreclk_div = 0;
+
+    atu_err = atu_rse_drv_init(&ATU_LIB_S, &ATU_DEV_S, ATU_DOMAIN_SECURE,
+                               atu_regions_static, atu_stat_count);
+    if (atu_err != ATU_ERR_NONE) {
+        return result;
+    }
+
+    result = AP_FLASH_DEV_NAME.Initialize(NULL);
+    if (result != 0) {
+        return result;
+    }
+
+    result = crypto_hw_accelerator_init();
+    if (result) {
+        return 1;
+    }
+
+    result = fwu_hal_bl2_update_state_and_flashmap();
+
+    (void)fih_delay_init();
+
+    return result;
+}
+
+/*
+ * Last function called before jumping to runtime. Used for final setup and
+ * cleanup.
+ */
+static int boot_platform_finish(void)
+{
+    /* Composite Power Domain state to be set for the AP */
+    uint32_t scmi_pd_state_set = MOD_PD_COMPOSITE_STATE(
+        MOD_PD_LEVEL_2, 0, MOD_PD_STATE_ON, MOD_PD_STATE_ON, MOD_PD_STATE_ON);
+
+    scmi_comms_err_t scmi_err;
+    uint32_t scmi_pd_id = 0;    /*power domain id of the AP*/
+    uint32_t scmi_pd_attributes;
+    uint8_t scmi_pd_name[SCMI_POWER_DOMAIN_NAME_LEN];
+    uint32_t scmi_pd_state_get;
+
+    BOOT_LOG_INF("BL2: AP power domain id = %d.", scmi_pd_id);
+
+    /* Read the attributes of the AP power domain */
+    scmi_err = scmi_comm_power_domain_attributes(scmi_pd_id,
+        &scmi_pd_attributes, &scmi_pd_name[0]);
+
+    if (scmi_err == SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_INF("BL2: AP power domain name = %s.", scmi_pd_name);
+        BOOT_LOG_INF("BL2: AP power domain attributes = 0x%x.",
+            scmi_pd_attributes);
+    } else {
+        BOOT_LOG_ERR("BL2: Fatal, SCMI get power domain attributes failed.");
+        scmi_comm_abort();
+        return 1;
+    }
+
+    /* RCC is a module with a list of registers used by FPGA flow to retrieve
+     * information from the running RTL. This handshake mechanism is implemented
+     * to let the flow know that CMN is configured so we can preload data
+     * targeting the DRAM region.
+     *
+     * Here we assume CMN configuration is completed by SI. There could be a
+     * better implementation in SCP-firmware where the handshake is done after
+     * CMN configuration is completed and before AP is turned ON.
+     *
+     * For SCP-firmware implementation use address 0x600000400 to access via
+     * SIEXP.
+     */
+#if (TFM_PLATFORM_VARIANT == APOLLO_FVP_VARIANT_RTL) && \
+    (TFM_RTL_VARIANT == APOLLO_FVP_RTL_VARIANT_FPGA)
+    {
+        uint32_t rd_val;
+
+        BOOT_LOG_INF("BL2: CMN configuration hand-shake");
+        *((volatile uint32_t *)RCC_DRAM_PRELOAD_HANDSHAKE_REG_ADDR) =
+            RCC_DRAM_PRELOAD_CMN_CFG_DONE_VAL;
+
+        BOOT_LOG_INF("Waiting for RCC hand-shake completion");
+            do {
+            rd_val = *((volatile uint32_t *)RCC_DRAM_PRELOAD_HANDSHAKE_REG_ADDR);
+        } while (rd_val != RCC_DRAM_PRELOAD_ACK_VAL);
+    }
+#endif
+
+/*
+     * Send SCMI command to SI CL0 to indicate that the RSE initialization is
+     * complete and that the SCP-firmware can turn on the AP primary core.
+     */
+    scmi_err = scmi_comm_power_domain_state_set(scmi_pd_id, scmi_pd_state_set);
+
+    if (scmi_err != SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_ERR("BL2: Fatal, RSE to SCP SCMI power on AP failed.");
+        scmi_comm_abort();
+        return 1;
+    }
+
+    /* Read back the power domain state*/
+    scmi_err = scmi_comm_power_domain_state_get(scmi_pd_id,
+        &scmi_pd_state_get);
+
+    if (scmi_err == SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_INF("BL2: AP power domain state = 0x%x.", scmi_pd_state_get);
+    } else {
+        BOOT_LOG_ERR("BL2: Fatal, Read back AP state failed.");
+        scmi_comm_abort();
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: RSE to SCP SCMI power on AP succeeded.");
+    return 0;
+}
+
+static enum atu_error_t initialise_atu_regions(struct atu_dev_t *dev,
+                                               uint8_t region_count,
+                                               const struct atu_map *regions,
+                                               const char *name)
+{
+    enum atu_error_t atu_err;
+
+    for (uint8_t idx = 0; idx < region_count; idx++) {
+        const struct atu_map *reg = &regions[idx];
+        enum atu_roba_t axnse, axprot1;
+
+        atu_err = atu_rse_initialize_region(dev, idx, reg->log_addr, reg->phy_addr, reg->size);
+        if (atu_err != ATU_ERR_NONE) {
+            BOOT_LOG_ERR("BL2: ERROR! %s ATU region %u init status: %d", name,
+                         idx, (int)atu_err);
+            return atu_err;
+        }
+
+        atu_err = atu_rse_set_bus_attributes(dev, idx, reg->bus_attr);
+        if (atu_err != ATU_ERR_NONE) {
+            BOOT_LOG_ERR("BL2: Unable to modify bus attributes for %s ATU region %u\n",
+                         name, idx);
+            return atu_err;
+        }
+
+        /* No support for "long long" prints, work around with more arguments */
+        BOOT_LOG_INF("BL2: %s ATU region %u: [0x%lx - 0x%lx]->[0x%lx_%08lx - 0x%lx_%08lx]",
+                     name, idx,
+                     (unsigned long)reg->log_addr,
+                     (unsigned long)(reg->log_addr + reg->size - 1),
+                     (unsigned long)(reg->phy_addr >> 32),
+                     (unsigned long)reg->phy_addr,
+                     (unsigned long)((reg->phy_addr + reg->size - 1) >> 32),
+                     (unsigned long)(reg->phy_addr + reg->size - 1));
+    }
+
+    return ATU_ERR_NONE;
+}
+
+/*
+ * ========================= SECURE LOAD FUNCTIONS =============================
+ */
+
+static int boot_platform_pre_load_secure(void)
+{
+    BOOT_LOG_WRN("There is a known issue in RSE platform apollo-fvp:\n"
+        "      Internal Trusted Storage (ITS) does not meet the required security expectations\n"
+        "      with respect to Confidentiality, Integrity, and Rollback Protection");
+    return 0;
+}
+
+static int boot_platform_post_load_secure(void)
+{
+    return boot_platform_finish();
+}
+
+/*
+ * =========================== AP BL2 LOAD FUNCTIONS ===========================
+ */
+
+static enum atu_error_t initialize_ap_atu(void)
+{
+    enum atu_error_t atu_err;
+
+    /* Configure RSE ATU to access the AP ATU */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_AP_ATU_ID,
+                                        HOST_AP_ATU_BASE_S,
+                                        HOST_AP_ATU_PHYS_BASE,
+                                        HOST_AP_ATU_GPV_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    /* Initialize the translation regions of the AP ATU */
+    atu_err = initialise_atu_regions(&HOST_AP_ATU_DEV, AP_ATU_REGION_COUNT,
+                                     ap_atu_regions, "AP");
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    /* Close RSE ATU region configured to access the AP ATU */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_AP_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+    /* Configure RSE ATU to access the SMD Expansion->SMD ATU */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                    HOST_SMDEXP2SMD_ATU_ID,
+                                    HOST_SMDEXP2SMD_ATU_BASE_S,
+                                    HOST_SMDEXP2SMD_ATU_PHYS_BASE,
+                                    HOST_SMDEXP2SMD_ATU_GPV_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    /* Initialize the translation regions of the SMD Expansion->SMD ATU */
+    atu_err = initialise_atu_regions(&HOST_SMDEXP2SMD_ATU_DEV,
+                                     SMDEXP2SMD_ATU_REGION_COUNT,
+                                     smdexp2smd_atu_regions,
+                                     "SMDEXP2SMD");
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    /* Close RSE ATU region configured to access the SMD Expansion->SMD ATU */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SMDEXP2SMD_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    return ATU_ERR_NONE;
+}
+
+/* Function called before AP BL2 firmware is loaded. */
+static int boot_platform_pre_load_ap_bl2(void)
+{
+    enum atu_error_t atu_err;
+    scmi_comms_err_t scmi_err;
+
+    BOOT_LOG_INF("BL2: AP BL2 pre load start");
+
+    /* Init the SCMI communication context */
+    BOOT_LOG_INF("BL2: Init SCMI comm to SCP ...");
+    scmi_err = scmi_comm_init();
+    BOOT_LOG_INF("BL2: SCMI to SCP share ram address = 0x%x",
+        HOST_RSE_SI_SSRAM_ATU_BASE_S);
+    if (scmi_err == SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_INF("BL2: Init SCMI comm to SCP succeeded");
+    } else {
+        BOOT_LOG_ERR("BL2: Fatal, init SCMI comm to SCP failed");
+        return 1;
+    }
+
+    /* Check if SCP SCMI service is live? */
+    for (uint8_t retries = 0; retries < MAX_RETRIES_PROTOCOL_VER; retries++) {
+        uint32_t scmi_protocol_version;
+
+        BOOT_LOG_INF("BL2: Getting SCMI power domain protocol version...");
+        scmi_err = scmi_comm_get_power_domain_version(&scmi_protocol_version);
+
+        if (scmi_err == SCMI_COMMS_SUCCESS) {
+            BOOT_LOG_INF("BL2: SCP ready. Power domain protocol version = 0x%x.",
+                            scmi_protocol_version);
+            break;
+        }
+        BOOT_LOG_INF("BL2: Failed to get protocol version, retrying...");
+        BOOT_LOG_INF("BL2: Busy wait...");
+        scmi_hal_wait(SCMI_BUSY_WAIT_CYCLES);
+    }
+
+    if (scmi_err != SCMI_COMMS_SUCCESS) {
+        BOOT_LOG_ERR("BL2: SCP is not ready. Abort");
+        scmi_comm_abort();
+        return 1;
+    }
+
+    /* Configure RSE ATU to access AP Secure Flash for AP BL2 */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_AP_FLASH_ATU_ID,
+                                        HOST_AP_FLASH_BASE,
+                                        HOST_AP_FLASH_PHY_BASE,
+                                        HOST_AP_FLASH_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access RSE header region for AP BL2 */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_IMG_HDR_LOAD_ID,
+                                        HOST_AP_BL2_HDR_ATU_WINDOW_BASE_S,
+                                        HOST_AP_BL2_HDR_PHYS_BASE,
+                                        RSE_IMG_HDR_ATU_WINDOW_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access AP BL2 Shared SRAM region */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_IMG_CODE_LOAD_ID,
+                                        HOST_AP_BL2_IMG_CODE_BASE_S,
+                                        HOST_AP_BL2_PHYS_BASE,
+                                        HOST_AP_BL2_ATU_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    if (fill_secure_flash_map_with_data() != 0) {
+        BOOT_LOG_ERR("BL2: Unable to extract AP BL2 from FIP");
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: AP BL2 pre load complete");
+
+    return 0;
+}
+
+/* Function called after AP BL2 firmware is loaded. */
+static int boot_platform_post_load_ap_bl2(void)
+{
+    enum atu_error_t atu_err;
+
+    BOOT_LOG_INF("BL2: AP BL2 post load start");
+
+    /*
+     * Since the measurement are taken at this point, clear the image
+     * header part in the Shared SRAM before releasing AP BL2 out of reset.
+     */
+    memset((void *)HOST_AP_BL2_IMG_HDR_BASE_S, 0, BL2_HEADER_SIZE);
+
+    /* Ensure the write is completed */
+    __DSB();
+
+    /* Close RSE ATU to access AP Secure Flash for AP BL2 */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_AP_FLASH_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access RSE header region for AP BL2 */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_IMG_HDR_LOAD_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access AP BL2 Shared SRAM region */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_IMG_CODE_LOAD_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure the AP ATU */
+    atu_err = initialize_ap_atu();
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: AP BL2 post load complete");
+
+    return 0;
+}
+
+static void delay_cycles(uint32_t cycles)
+{
+    while (cycles--) {
+        __asm__("nop");
+    }
+}
+
+static int trigger_lbist_si(void)
+{
+    enum ppu_error_t ppu_err;
+
+    /* Configure SYSTOP dommain PPU of SI to FULL-RET to isolate TD-SYS */
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_SYSTOP_PPU_DEV,
+                                       PPU_PWR_POLICY_FULL_RET);
+    if (ppu_err != PPU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: SI TD_SYS domain Isolation failed: %d",
+                     (int)ppu_err);
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: SI LBIST happens here");
+
+    /* Mimic the LBIST execution with a delay. */
+    delay_cycles(LBIST_WAIT_CYCLES);
+
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_SYSTOP_PPU_DEV,
+                                       PPU_PWR_POLICY_OFF);
+    if (ppu_err != PPU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: Turning off SI SYSTOP PPU failed: %d", (int)ppu_err);
+        return 1;
+    }
+
+    return 0;
+}
+
+static int trigger_mbist_si(void)
+{
+    BOOT_LOG_INF("BL2: SI MBIST happens here");
+
+    /* Mimic the MBIST execution with a delay. */
+    delay_cycles(MBIST_WAIT_CYCLES);
+    return 0;
+}
+
+/* Enable SI PIK is powered on */
+static int boot_platform_si_pre_load(void)
+{
+    enum atu_error_t atu_err;
+    enum ppu_error_t ppu_err;
+    int error;
+
+    /* Configure RSE ATU to access SI PIK */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_PIK_ATU_ID,
+                                        HOST_SI_PIK_ATU_WINDOW_BASE_S,
+                                        HOST_SI_PIK_PHYS_BASE,
+                                        HOST_SI_PIK_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI PIK window", (int)atu_err);
+        return 1;
+    }
+
+    /* Trigger LBIST for Safety Island*/
+    error = trigger_lbist_si();
+    if(error != 0) {
+        BOOT_LOG_ERR("BL2: SI LBIST failed");
+        return 1;
+    }
+
+    /* Power up SI power domain */
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_SYSTOP_PPU_DEV,
+                                          PPU_PWR_POLICY_ON);
+    if (ppu_err != PPU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: SI SYSTOP release failed: %d", (int)ppu_err);
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access SI PIK */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_PIK_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI PIK window", (int)atu_err);
+        return 1;
+    }
+
+    return 0;
+}
+
+/*
+ * =========================== SI CL0 LOAD FUNCTIONS ===========================
+ */
+
+ static bool check_si_cl1_is_present(void)
+{
+    enum atu_error_t atu_err;
+    bool present = false;
+
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI SID window", (int)atu_err);
+        return false;
+    }
+
+    present = scr_sid_is_cl1_present(&HOST_SI_SCR_DEV);
+
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SCR window", (int)atu_err);
+        return false;
+    }
+
+    return present;
+}
+
+static enum atu_error_t initialize_si_atu(void)
+{
+    enum atu_error_t atu_err;
+
+    /* Configure RSE ATU to access the SI ATU */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_ATU_ID,
+                                        HOST_SI_ATU_BASE_S,
+                                        HOST_SI_ATU_PHYS_BASE,
+                                        HOST_SI_ATU_GPV_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    /* Initialize the translation regions of the SI ATU */
+    atu_err = initialise_atu_regions(&HOST_SI_ATU_DEV, SI_ATU_REGION_COUNT,
+                                     si_atu_regions, "SI");
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    /* Close RSE ATU region configured to access the SI ATU */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return atu_err;
+    }
+
+    return ATU_ERR_NONE;
+}
+
+/* Function called before SI CL0 firmware is loaded. */
+static int boot_platform_pre_load_si_cl0(void)
+{
+    enum atu_error_t atu_err;
+    enum ppu_error_t ppu_err;
+    int error;
+    volatile scr_t *scr = (volatile scr_t *)HOST_SI_SCR_DEV.scr_base;
+    volatile systop_pik_t *systop_pik = (volatile systop_pik_t *)HOST_SYSTOP_PIK_DEV.pik_base;
+
+    BOOT_LOG_INF("BL2: SI CL0 pre load start");
+
+    /* Configure RSE ATU to access SI CL0 Cluster Utility Bus */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_CL0_CUB_ATU_ID,
+                                        HOST_SI_CL0_CUB_ATU_WINDOW_BASE_S,
+                                        HOST_SI_CL0_CUB_BASE,
+                                        HOST_SI_CL0_CUB_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /*
+     * Halt the cpus and turn on the cpu power
+     */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI SID window", (int)atu_err);
+        return false;
+    }
+
+    scr_cfg_cpuhalt(&HOST_SI_SCR_DEV, true);
+
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SCR window", (int)atu_err);
+        return false;
+    }
+
+    /* Power up SI CL0 */
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_CL0_CLUS_PPU_DEV,
+                                       PPU_PWR_POLICY_ON);
+    if (ppu_err != PPU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: SI CL0 CLUS release failed: %d", (int)ppu_err);
+        return 1;
+    }
+
+    /* Trigger MBIST for SI SRAM, TCM, cache memories */
+    error = trigger_mbist_si();
+    if(error != 0) {
+        BOOT_LOG_ERR("BL2: SI MBIST failed");
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access SI CL0 Cluster Utility Bus */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_CL0_CUB_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access RSE header region for SI CL0 */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_IMG_HDR_LOAD_ID,
+                                        HOST_SI_CL0_HDR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_CL0_HDR_PHYS_BASE,
+                                        RSE_IMG_HDR_ATU_WINDOW_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access SI CL0 Shared SRAM region */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_IMG_CODE_LOAD_ID,
+                                        HOST_SI_CL0_IMG_CODE_BASE_S,
+                                        HOST_SI_CL0_PHYS_BASE,
+                                        HOST_SI_CL0_ATU_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access SI System Control Registers */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access SI Shared SRAM */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_SI_SSRAM_ID,
+                                        HOST_RSE_SI_SSRAM_ATU_BASE_S,
+                                        HOST_RSE_SI_SSRAM_ATU_PHYS_BASE,
+                                        HOST_RSE_SI_SSRAM_ATU_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    clear_safety_island_memory(&HOST_SI_SCR_DEV);
+
+    /* In the Safety Island, the UARTs are not protected by any safety mechanism,
+     * as they are not safety relevant. To ensure there is no interference from the UARTs
+     * in the case of an error (e.g. a spurious interrupt to the GIC), the UART outputs are
+     * safely gated with the DEBUG_ALLOWED signal from the SCR.
+     * Enable DEBUG_ALLOWED signal to see UART messages.
+     */
+    scr->safectlr |= (1U << SI_SAFECTRL_DBG_ALLOWED_SHIFT);
+
+    /* Close RSE ATU region configured to access SI System Control Registers */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access SI Shared SRAM */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_SI_SSRAM_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access Systop PIK */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SYSTOP_PIK_ATU_ID,
+                                        HOST_SYSTOP_PIK_ATU_WINDOW_BASE_S,
+                                        HOST_SYSTOP_PIK_PHYS_BASE,
+                                        HOST_SYSTOP_PIK_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for Systop PIK window", (int)atu_err);
+        return 1;
+    }
+
+    /*
+     * The Address Translation Units (ATUs) in the Safety Island Address
+     * Translation Block translate the addresses of read and write transactions
+     * originating from the Safety Island.
+     *
+     * The Address Translation Block forwards these translated transactions to
+     * the host subsystem through the PCMA and PCPA interfaces.
+     *
+     * In certain conditions, read and write requests or responses may not
+     * propagate correctly through the Address Translation Block. Ensuring the
+     * Safety Island clock remains enabled avoids this issue.
+     *
+     * This change sets the Safety Island clock force-set bit in the systop PIK
+     * to keep the clock ungated.
+     */
+    /* Configure RSE ATU to access Systop PIK */
+    systop_pik->clkforce_set |= (1U << SISYSCLK_FORCE_SET_SHIFT);
+
+    /* Close RSE ATU region configured to access Systop PIK */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SYSTOP_PIK_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for Systop PIK window", (int)atu_err);
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: SI CL0 pre load complete");
+
+    return 0;
+}
+
+/* Function called after SI CL0 firmware is loaded. */
+static int boot_platform_post_load_si_cl0(void)
+{
+    enum atu_error_t atu_err;
+    enum ppu_error_t si_cl0_err;
+
+    BOOT_LOG_INF("BL2: SI CL0 post load start");
+
+    /*
+     * Since the measurement are taken at this point, clear the image
+     * header part in the Shared SRAM before releasing SI CL0 out of reset.
+     */
+    memset((void *)HOST_SI_CL0_IMG_HDR_BASE_S, 0, BL2_HEADER_SIZE);
+
+    /* Ensure the write is completed */
+    __DSB();
+
+    /* Configure the SI ATU before starting the SI CL0 */
+    atu_err = initialize_si_atu();
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access SI CL0 Cluster Utility Bus */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_CL0_CUB_ATU_ID,
+                                        HOST_SI_CL0_CUB_ATU_WINDOW_BASE_S,
+                                        HOST_SI_CL0_CUB_BASE,
+                                        HOST_SI_CL0_CUB_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    si_cl0_err = ppu_drv_cfg_power_policy(&HOST_SI_CL0_CORE0_PPU_DEV,
+                                             PPU_PWR_POLICY_ON);
+    if (si_cl0_err != PPU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: SI CL0 CORE0 release failed: %d", (int)si_cl0_err);
+        return 1;
+    }
+    BOOT_LOG_INF("BL2: SI CL0 is released out of reset");
+
+    /* Close RSE ATU region configured to access SI CL0 Cluster Utility Bus */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_CL0_CUB_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_SCR_ATU_ID,
+                                        HOST_SI_SCR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_SCR_PHYS_BASE,
+                                        HOST_SI_SCR_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU init failed (%d) for SI SID window", (int)atu_err);
+        return false;
+    }
+
+    /* Unhalt/ release the cpus */
+    scr_cfg_cpuhalt(&HOST_SI_SCR_DEV, false);
+
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_SCR_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: ATU uninit failed (%d) for SI SCR window", (int)atu_err);
+        return false;
+    }
+
+    /* Close RSE ATU region configured to access RSE header region for SI CL0 */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_IMG_HDR_LOAD_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access SI CL0 Shared SRAM region */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_IMG_CODE_LOAD_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: SI CL0 post load complete");
+
+    /* Introduce a startup delay to ensure SI CL1 has enough time to begin
+     * booting and finish the PFDI Out-of-Reset(OOR) sequence before subsequent
+     * steps run. */
+    if (check_si_cl1_is_present()) {
+        delay_cycles(CL1_BOOT_WAIT_CYCLES);
+    }
+    return 0;
+}
+
+/* Function called before SI CL1 firmware is loaded. */
+static int boot_platform_pre_load_si_cl1(void)
+{
+    enum atu_error_t atu_err;
+    enum ppu_error_t ppu_err;
+
+    BOOT_LOG_INF("BL2: SI CL1 pre load start");
+
+    /* Configure RSE ATU to access SI CL1 Cluster Utility Bus */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        HOST_SI_CL1_CUB_ATU_ID,
+                                        HOST_SI_CL1_CUB_ATU_WINDOW_BASE_S,
+                                        HOST_SI_CL1_CUB_BASE,
+                                        HOST_SI_CL1_CUB_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Power up SI CL1 */
+    ppu_err = ppu_drv_cfg_power_policy(&HOST_SI_CL1_CLUS_PPU_DEV,
+                                          PPU_PWR_POLICY_ON);
+    if (ppu_err != PPU_ERR_NONE) {
+        BOOT_LOG_ERR("BL2: SI CL0 CLUS release failed: %d", (int)ppu_err);
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access SI CL1 Cluster Utility Bus */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, HOST_SI_CL1_CUB_ATU_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access RSE header region for SI CL1 */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_IMG_HDR_LOAD_ID,
+                                        HOST_SI_CL1_HDR_ATU_WINDOW_BASE_S,
+                                        HOST_SI_CL1_HDR_PHYS_BASE,
+                                        RSE_IMG_HDR_ATU_WINDOW_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Configure RSE ATU to access SI CL1 Shared SRAM region */
+    atu_err = atu_rse_initialize_region(&ATU_DEV_S,
+                                        RSE_ATU_IMG_CODE_LOAD_ID,
+                                        HOST_SI_CL1_IMG_CODE_BASE_S,
+                                        HOST_SI_CL1_PHYS_BASE,
+                                        HOST_SI_CL1_ATU_SIZE);
+    if (atu_err != ATU_ERR_NONE) {
+                return 1;
+    }
+
+    BOOT_LOG_INF("BL2: SI CL1 pre load complete");
+
+    return 0;
+}
+
+/* Function called after SI CL1 firmware is loaded. */
+static int boot_platform_post_load_si_cl1(void)
+{
+    enum atu_error_t atu_err;
+
+    BOOT_LOG_INF("BL2: SI CL1 post load start");
+
+    /*
+     * Since the measurement are taken at this point, clear the image
+     * header part in the Shared SRAM before releasing SI CL1 out of reset.
+     */
+    memset((void *)HOST_SI_CL1_IMG_HDR_BASE_S, 0, BL2_HEADER_SIZE);
+
+    /* Close RSE ATU region configured to access RSE header region for SI CL1 */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_IMG_HDR_LOAD_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    /* Close RSE ATU region configured to access SI CL1 Shared SRAM region */
+    atu_err = atu_rse_uninitialize_region(&ATU_DEV_S, RSE_ATU_IMG_CODE_LOAD_ID);
+    if (atu_err != ATU_ERR_NONE) {
+        return 1;
+    }
+
+    BOOT_LOG_INF("BL2: SI CL1 post load complete");
+
+    return 0;
+}
+
+/*
+ * ================================= VECTORS ==================================
+ */
+
+/*
+ * Array of function pointers to call before each image is loaded indexed by
+ * image id
+ */
+static int (*boot_platform_pre_load_vector[RSE_FIRMWARE_COUNT]) (void) = {
+    [RSE_FIRMWARE_SECURE_ID]        = boot_platform_pre_load_secure,
+    [RSE_FIRMWARE_SI_CL0_ID]        = boot_platform_pre_load_si_cl0,
+    [RSE_FIRMWARE_SI_CL1_ID]        = boot_platform_pre_load_si_cl1,
+    [RSE_FIRMWARE_AP_BL2_ID]        = boot_platform_pre_load_ap_bl2,
+};
+
+/*
+ * Array of function pointers to call after each image is loaded indexed by
+ * image id
+ */
+static int (*boot_platform_post_load_vector[RSE_FIRMWARE_COUNT]) (void) = {
+    [RSE_FIRMWARE_SECURE_ID]        = boot_platform_post_load_secure,
+    [RSE_FIRMWARE_SI_CL0_ID]        = boot_platform_post_load_si_cl0,
+    [RSE_FIRMWARE_SI_CL1_ID]        = boot_platform_post_load_si_cl1,
+    [RSE_FIRMWARE_AP_BL2_ID]        = boot_platform_post_load_ap_bl2,
+};
+
+/*
+ * ============================== LOAD FUNCTIONS ==============================
+ */
+
+int boot_platform_pre_load(uint32_t image_id)
+{
+    if (image_id >= RSE_FIRMWARE_COUNT) {
+        BOOT_LOG_WRN("BL2: no pre load for image %u", image_id);
+        return 0;
+    }
+
+    return boot_platform_pre_load_vector[image_id]();
+}
+
+int boot_platform_post_load(uint32_t image_id)
+{
+    if (image_id >= RSE_FIRMWARE_COUNT) {
+        BOOT_LOG_WRN("BL2: no post load for image %u", image_id);
+        return 0;
+    }
+
+    return boot_platform_post_load_vector[image_id]();
+}
+
+bool boot_platform_should_load_image(uint32_t image_id)
+{
+    if (image_id == RSE_FIRMWARE_NON_SECURE_ID) {
+        return false;
+    }
+
+    if (image_id == RSE_FIRMWARE_SI_CL1_ID) {
+        /* Ensure SI PIK is powered on before accessing SI space*/
+        if (boot_platform_si_pre_load()) {
+            BOOT_LOG_ERR("BL2: SI PIK power-on/pre-load failed");
+            return false;
+        }
+        /* Check if SI CL1 is present */
+        if (!check_si_cl1_is_present()) {
+            BOOT_LOG_INF("BL2: SI CL1 not present, skip loading");
+            return false;
+        }
+    }
+
+    if (image_id >= RSE_FIRMWARE_COUNT) {
+        BOOT_LOG_WRN("BL2: Image %u beyond expected Firmware count: %d",
+                image_id, RSE_FIRMWARE_COUNT);
+        return false;
+    }
+
+    return true;
+}
