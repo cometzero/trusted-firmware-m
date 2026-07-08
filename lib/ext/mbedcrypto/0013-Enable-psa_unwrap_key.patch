@@ -9,8 +9,8 @@ After switching to the new version, this change is not required.
 
 Signed-off-by: Athul P Satheesan <athul.ps@arm.com>
 ---
- library/psa_crypto.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ library/psa_crypto.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
 diff --git a/library/psa_crypto.c b/library/psa_crypto.c
 index 22f143bdfc..6675dca42c 100644
@@ -24,7 +24,7 @@ index 22f143bdfc..6675dca42c 100644
  
  #include "constant_time_internal.h"
  
-@@ -1560,6 +1561,37 @@ exit:
+@@ -1560,6 +1561,39 @@ exit:
      return (status == PSA_SUCCESS) ? unlock_status : status;
  }
  
@@ -39,9 +39,10 @@ index 22f143bdfc..6675dca42c 100644
 +    unsigned char key[PSA_CIPHER_MAX_KEY_LENGTH] = {0};
 +    size_t output_length = 0;
 +    mbedtls_svc_key_id_t mbedtls_wrap_key_id;
++    mbedtls_svc_key_id_t imported_key_id = MBEDTLS_SVC_KEY_ID_INIT;
 +
 +    (void) alg;
-+    mbedtls_wrap_key_id.key_id = wrap_key_id;
++    mbedtls_wrap_key_id = mbedtls_svc_key_id_make(0, wrap_key_id);
 +    status = mbedtls_nist_kw_unwrap(mbedtls_wrap_key_id, MBEDTLS_KW_MODE_KW,
 +                                    data, data_length,
 +                                    &key[0], sizeof(key),
@@ -50,10 +51,11 @@ index 22f143bdfc..6675dca42c 100644
 +        return status;
 +    }
 +    status = psa_import_key(attributes, (const uint8_t *) key,
-+                            output_length, key_id);
++                            output_length, &imported_key_id);
 +    if (status != PSA_SUCCESS) {
 +        return status;
 +    }
++    *key_id = MBEDTLS_SVC_KEY_ID_GET_KEY_ID(imported_key_id);
 +
 +    status = psa_destroy_key(mbedtls_wrap_key_id);
 +    return status;
@@ -64,4 +66,3 @@ index 22f143bdfc..6675dca42c 100644
      const uint8_t *key_buffer,
 -- 
 2.34.1
-

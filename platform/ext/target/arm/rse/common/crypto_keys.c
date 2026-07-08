@@ -24,6 +24,10 @@
 #define TFM_NS_PARTITION_ID                        MAPPED_RSE_MBOX_NS_AGENT_DEFAULT_CLIENT_ID
 #define ENC_KEY_LEN 32
 
+#if defined(TFM_RUNTIME_DECRYPTION) && !defined(PSA_KEY_USAGE_UNWRAP)
+#define PSA_KEY_USAGE_UNWRAP PSA_KEY_USAGE_DECRYPT
+#endif
+
 static enum tfm_plat_err_t tfm_plat_get_huk(const void *ctx,
                                             uint8_t *buf, size_t buf_len,
                                             size_t *key_len,
