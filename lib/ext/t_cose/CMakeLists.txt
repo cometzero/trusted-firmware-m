@@ -34,7 +34,7 @@ fetch_remote_library(
 
 add_library(tfm_t_cose_s STATIC EXCLUDE_FROM_ALL
     ${T_COSE_PATH}/crypto_adapters/t_cose_psa_crypto.c
-    ${T_COSE_PATH}/src/t_cose_key.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/t_cose_key.c
     ${T_COSE_PATH}/src/t_cose_parameters.c
     ${T_COSE_PATH}/src/t_cose_util.c
 )
@@ -50,6 +50,7 @@ target_sources(tfm_t_cose_s
     PRIVATE
         ${T_COSE_PATH}/src/t_cose_sign_sign.c
         ${T_COSE_PATH}/src/t_cose_sign1_sign.c
+        ${T_COSE_PATH}/src/t_cose_signature_sign_eddsa.c
         ${T_COSE_PATH}/src/t_cose_signature_sign_main.c
         ${T_COSE_PATH}/src/t_cose_sign_verify.c
         ${T_COSE_PATH}/src/t_cose_sign1_verify.c
@@ -59,6 +60,7 @@ endif()
 
 target_include_directories(tfm_t_cose_s
     PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/inc>
         $<BUILD_INTERFACE:${T_COSE_PATH}/inc>
         $<BUILD_INTERFACE:${T_COSE_PATH}/src>
 )
