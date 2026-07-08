@@ -14,10 +14,6 @@
 #include "tfm_crypto_api.h"
 #include "tfm_crypto_defs.h"
 
-#if defined(PSA_CRYPTO_DRIVER_CC3XX)
-#include "cc3xx_psa_hash.h"
-#endif
-
 /*!
  * \addtogroup tfm_crypto_api_shim_layer
  *
@@ -115,17 +111,6 @@ psa_status_t tfm_crypto_hash_interface(psa_invec in_vec[],
         size_t input_length = in_vec[1].len;
         uint8_t *hash = out_vec[0].base;
         size_t hash_size = out_vec[0].len;
-
-#if defined(PSA_CRYPTO_DRIVER_CC3XX)
-        status = cc3xx_hash_compute(iov->alg, input, input_length,
-                                    hash, hash_size, &out_vec[0].len);
-        if (status != PSA_ERROR_NOT_SUPPORTED) {
-            if (status != PSA_SUCCESS) {
-                out_vec[0].len = 0;
-            }
-            return status;
-        }
-#endif
 
         status = psa_hash_compute(iov->alg, input, input_length,
                                   hash, hash_size, &out_vec[0].len);

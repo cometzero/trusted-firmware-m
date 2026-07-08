@@ -203,7 +203,6 @@ set_target_properties(${MBEDTLS_TARGET_PREFIX}mbedcrypto PROPERTIES LINK_INTERFA
 
 target_sources(${MBEDTLS_TARGET_PREFIX}mbedcrypto
     PRIVATE
-        crypto_unwrap_key.c
         $<$<NOT:$<BOOL:${CRYPTO_HW_ACCELERATOR}>>:${CMAKE_CURRENT_SOURCE_DIR}/tfm_mbedcrypto_alt.c>
 )
 

@@ -10,7 +10,6 @@
 #include "rse_provisioning_aes_key.h"
 #include "rse_kmu_keys.h"
 #include "device_definition.h"
-#include "tfm_log.h"
 
 static inline bool message_is_combined(const struct rse_provisioning_authentication_header_t *header)
 {
@@ -32,7 +31,6 @@ rse_provisioning_setup_aes_key(const struct rse_provisioning_authentication_head
 
     lcm_err = lcm_get_lcs(&LCM_DEV_S, &lcs);
     if (lcm_err != LCM_ERROR_NONE) {
-        ERROR("Provisioning LCS read failed: 0x%x\r\n", lcm_err);
         return (enum tfm_plat_err_t)lcm_err;
     }
 
@@ -67,13 +65,6 @@ rse_provisioning_setup_aes_key(const struct rse_provisioning_authentication_head
 
     err = rse_setup_master_key(label, label_len, context, context_len);
     if (err != TFM_PLAT_ERR_SUCCESS) {
-        enum lcm_tp_mode_t tp_mode = LCM_TP_MODE_INVALID;
-        enum lcm_bool_t sp_enabled = LCM_FALSE;
-
-        (void)lcm_get_tp_mode(&LCM_DEV_S, &tp_mode);
-        (void)lcm_get_sp_enabled(&LCM_DEV_S, &sp_enabled);
-        ERROR("Provisioning master key failed: err=0x%x lcs=0x%x tp=0x%x sp=0x%x\r\n",
-              err, lcs, tp_mode, sp_enabled);
         return err;
     }
 
@@ -87,16 +78,5 @@ rse_provisioning_setup_aes_key(const struct rse_provisioning_authentication_head
         label_len = sizeof("KPROV_DM");
     }
 
-    err = rse_setup_provisioning_key(label, label_len, NULL, 0);
-    if (err != TFM_PLAT_ERR_SUCCESS) {
-        enum lcm_tp_mode_t tp_mode = LCM_TP_MODE_INVALID;
-        enum lcm_bool_t sp_enabled = LCM_FALSE;
-
-        (void)lcm_get_tp_mode(&LCM_DEV_S, &tp_mode);
-        (void)lcm_get_sp_enabled(&LCM_DEV_S, &sp_enabled);
-        ERROR("Provisioning key derivation failed: err=0x%x lcs=0x%x tp=0x%x sp=0x%x\r\n",
-              err, lcs, tp_mode, sp_enabled);
-    }
-
-    return err;
+    return rse_setup_provisioning_key(label, label_len, NULL, 0);
 }
