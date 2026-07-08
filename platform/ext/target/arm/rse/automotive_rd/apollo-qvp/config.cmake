@@ -20,7 +20,6 @@ set(PLATFORM_HAS_PS_NV_OTP_COUNTERS     ON       CACHE BOOL    "Platform support
 set(PLATFORM_HOST_HAS_SI_CL             ON       CACHE BOOL    "Enable Safety Island Cluster (SI CL) support")
 set(PLATFORM_RSE_HAS_ATU_OWNERSHIP      ON       CACHE BOOL    "Enable RSE ATU ownership")
 set(PLAT_MHU_VERSION                    3        CACHE STRING  "Supported MHU version by platform")
-set(PS_CRYPTO_AEAD_ALG                  PSA_ALG_CCM CACHE STRING "The AEAD algorithm to use for authenticated encryption in Protected Storage")
 set(RSE_HAS_EXPANSION_PERIPHERALS       ON       CACHE BOOL    "Whether RSE has sub-platform specific peripherals in the expansion layer")
 set(RSE_SUBPLATFORM_BOOT_MEASUREMENTS   ON       CACHE BOOL    "Use RSE subplatform boot measurement slot definition")
 set(RSE_USE_HOST_FLASH                  OFF      CACHE BOOL    "Enable RSE using the host flash.")
