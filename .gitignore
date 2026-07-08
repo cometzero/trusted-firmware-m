@@ -30,3 +30,4 @@ trusted_firmware_m.egg-info/
 
 # clangd
 .cache/
+/oe-*
