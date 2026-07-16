@@ -13,6 +13,8 @@
 #include "scmi_comms.h"
 #include "scmi_hal.h"
 
+#define SCMI_TRANSPORT_POLL_ATTEMPTS 100U
+
 uint32_t scmi_message_header(uint8_t message_id, uint8_t message_type,
                                     uint8_t protocol_id, uint8_t token)
 {
@@ -120,19 +122,21 @@ int32_t transport_send(const struct scmi_message_t *msg)
 
 scmi_comms_err_t transport_wait(void)
 {
-    scmi_comms_err_t err;
-    uint32_t value = 0;
+    for (uint32_t attempt = 0; attempt < SCMI_TRANSPORT_POLL_ATTEMPTS;
+         ++attempt) {
+        uint32_t value = 0;
+        scmi_comms_err_t err = scmi_hal_doorbell_read(&value);
 
-    err = scmi_hal_doorbell_read(&value);
-    if (err != SCMI_COMMS_SUCCESS) {
-        return SCMI_COMMS_HARDWARE_ERROR;
+        if (err != SCMI_COMMS_SUCCESS) {
+            return SCMI_COMMS_HARDWARE_ERROR;
+        }
+        if (value & SI_MHU_COMMAND_MBX_FLAG) {
+            return SCMI_COMMS_SUCCESS;
+        }
+        scmi_hal_wait(SCMI_HAL_WAIT_TIME);
     }
 
-    if (!(value & SI_MHU_COMMAND_MBX_FLAG)) {
-        return SCMI_STATUS_GENERIC_ERROR;
-    }
-
-    return SCMI_COMMS_SUCCESS;
+    return SCMI_STATUS_GENERIC_ERROR;
 }
 
 /**

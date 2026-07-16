@@ -31,7 +31,7 @@
 #include <string.h>
 
 #define SCMI_BUSY_WAIT_CYCLES       10000000
-#define MAX_RETRIES_PROTOCOL_VER    3
+#define MAX_RETRIES_PROTOCOL_VER    30
 
 #define LBIST_WAIT_CYCLES           12500000
 #define MBIST_WAIT_CYCLES           10000000
