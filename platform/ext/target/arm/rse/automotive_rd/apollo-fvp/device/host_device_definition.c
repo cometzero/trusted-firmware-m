@@ -273,5 +273,11 @@ const struct atu_map ap_atu_regions[AP_ATU_REGION_COUNT] = {
         .size = 0x2000UL,
         .bus_attr = ATU_ENCODE_ATTRIBUTES_SECURE_PAS,
     },
+    [AP_ATU_REGION_IDX_SMD_GPIO] = {
+        .log_addr = 0x40750000UL,
+        .phy_addr = 0x20000D0310000ULL,
+        .size = 0x10000UL,
+        .bus_attr = ATU_ENCODE_ATTRIBUTES_NON_SECURE_PAS,
+    },
 };
 #endif /* PLATFORM_RSE_HAS_ATU_OWNERSHIP */

@@ -13,7 +13,8 @@ target_compile_definitions(platform_common_interface
                                APOLLO_FVP_VARIANT_FVP=0
                                APOLLO_FVP_VARIANT_RTL=1
                                APOLLO_FVP_RTL_VARIANT_FPGA=0
-                               APOLLO_FVP_RTL_VARIANT_EMU=1)
+                               APOLLO_FVP_RTL_VARIANT_EMU=1
+                               $<$<BOOL:${RSE_GPIO_SELF_TEST}>:RSE_GPIO_SELF_TEST>)
 
 if (TFM_PLATFORM_VARIANT STREQUAL "fvp")
       target_compile_definitions(platform_common_interface
