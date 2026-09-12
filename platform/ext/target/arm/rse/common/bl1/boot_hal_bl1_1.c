@@ -38,6 +38,9 @@
 #include "startup_bl1_1_helpers.h"
 #include "psa/crypto.h"
 #include "bl1_random.h"
+#ifdef APOLLO_TIMER_TEST
+#include "timer_self_test.h"
+#endif
 
 #include "tfm_utils.h"
 
@@ -193,6 +196,12 @@ int32_t boot_platform_init(void)
 #ifdef LOGGING_ENABLED
     stdio_init();
 #endif /* LOGGING_ENABLED */
+
+#ifdef APOLLO_TIMER_TEST
+    if (apollo_timer_self_test("BL1_1") != 0) {
+        return TFM_PLAT_ERR_SYSTEM_ERR;
+    }
+#endif
 
     plat_err = minimal_otp_init();
     if (plat_err != TFM_PLAT_ERR_SUCCESS) {

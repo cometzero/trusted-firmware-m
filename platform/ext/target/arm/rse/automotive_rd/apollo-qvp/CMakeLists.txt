@@ -14,7 +14,20 @@ target_compile_definitions(platform_common_interface
                                APOLLO_FVP_VARIANT_RTL=1
                                APOLLO_FVP_RTL_VARIANT_FPGA=0
                                APOLLO_FVP_RTL_VARIANT_EMU=1
+                               $<$<BOOL:${APOLLO_TIMER_TEST}>:APOLLO_TIMER_TEST>
                                $<$<BOOL:${RSE_GPIO_SELF_TEST}>:RSE_GPIO_SELF_TEST>)
+
+target_include_directories(platform_common_interface
+    INTERFACE
+        .
+        ${PLATFORM_DIR}/ext/target/arm/drivers/timer/armv8m
+)
+
+if (APOLLO_TIMER_TEST)
+    foreach(target platform_bl1_1 platform_bl1_2 platform_bl2 platform_s)
+        target_sources(${target} PRIVATE timer_self_test.c)
+    endforeach()
+endif()
 
 if (TFM_PLATFORM_VARIANT STREQUAL "fvp")
       target_compile_definitions(platform_common_interface

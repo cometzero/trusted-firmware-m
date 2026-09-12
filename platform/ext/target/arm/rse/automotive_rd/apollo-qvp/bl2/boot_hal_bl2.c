@@ -27,6 +27,9 @@
 #include "systop_pik.h"
 #include "tfm_boot_status.h"
 #include "tfm_plat_defs.h"
+#ifdef APOLLO_TIMER_TEST
+#include "timer_self_test.h"
+#endif
 
 #include <string.h>
 
@@ -241,6 +244,12 @@ int32_t boot_platform_post_init(void)
     /* Set the RSE to use the system PLL with 1/1 clock division */
     integ_layer->rsecoreclk_ctrl = RSE_INTEG_CLKCTRL_SEL_SPLL;
     integ_layer->rsecoreclk_div = 0;
+
+#ifdef APOLLO_TIMER_TEST
+    if (apollo_timer_self_test("BL2") != 0) {
+        return 1;
+    }
+#endif
 
     atu_err = atu_rse_drv_init(&ATU_LIB_S, &ATU_DEV_S, ATU_DOMAIN_SECURE,
                                atu_regions_static, atu_stat_count);

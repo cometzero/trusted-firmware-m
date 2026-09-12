@@ -22,6 +22,7 @@ set(PLATFORM_RSE_HAS_ATU_OWNERSHIP      ON       CACHE BOOL    "Enable RSE ATU o
 set(PLAT_MHU_VERSION                    3        CACHE STRING  "Supported MHU version by platform")
 set(RSE_HAS_EXPANSION_PERIPHERALS       ON       CACHE BOOL    "Whether RSE has sub-platform specific peripherals in the expansion layer")
 set(RSE_GPIO_SELF_TEST                  ON       CACHE BOOL    "Run the RSE PL061 GPIO self-test during platform initialization")
+set(APOLLO_TIMER_TEST                   OFF      CACHE BOOL    "Run the Apollo RSE timer self-test in every firmware stage")
 set(RSE_SUBPLATFORM_BOOT_MEASUREMENTS   ON       CACHE BOOL    "Use RSE subplatform boot measurement slot definition")
 set(RSE_USE_HOST_FLASH                  OFF      CACHE BOOL    "Enable RSE using the host flash.")
 set(RSE_USE_HOST_UART                   ON       CACHE BOOL    "Whether RSE should use the UART from the host system (opposed to dedicated UART private to RSE)")

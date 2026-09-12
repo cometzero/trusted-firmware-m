@@ -44,6 +44,9 @@
 #include "bl1_2_debug.h"
 #include "sku_se_dev.h"
 #include "tfm_utils.h"
+#ifdef APOLLO_TIMER_TEST
+#include "timer_self_test.h"
+#endif
 
 #define __CONCAT_(a, b) a##b
 #define _CONCAT(a, b)  __CONCAT_(a, b)
@@ -275,6 +278,12 @@ int32_t boot_platform_init(void)
 #ifdef LOGGING_ENABLED
     stdio_init();
 #endif /* LOGGING_ENABLED */
+
+#ifdef APOLLO_TIMER_TEST
+    if (apollo_timer_self_test("BL1_2") != 0) {
+        return TFM_PLAT_ERR_SYSTEM_ERR;
+    }
+#endif
 
     result = FLASH_DEV_NAME.Initialize(NULL);
     if (result != ARM_DRIVER_OK) {

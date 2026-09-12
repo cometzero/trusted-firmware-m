@@ -15,6 +15,9 @@
 #include "rse_sam_config.h"
 #include "atu_config.h"
 #include "atu_rse_lib.h"
+#ifdef APOLLO_TIMER_TEST
+#include "timer_self_test.h"
+#endif
 
 #ifdef RSE_GPIO_SELF_TEST
 #include "gpio_pl061_drv.h"
@@ -87,6 +90,12 @@ enum tfm_hal_status_t tfm_hal_platform_init(void)
 
     __enable_irq();
     stdio_init();
+
+#ifdef APOLLO_TIMER_TEST
+    if (apollo_timer_self_test("RUNTIME") != 0) {
+        return TFM_HAL_ERROR_GENERIC;
+    }
+#endif
 
 #ifdef RSE_GPIO_SELF_TEST
     if (!rse_gpio_self_test_device(GPIO0_DEV_S) ||
