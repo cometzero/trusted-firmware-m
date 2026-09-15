@@ -333,6 +333,16 @@ int32_t scmi_hal_sys_power_state(uint32_t agent_id, uint32_t flags,
             SCMI_LOG_NOT("Resetting system (warm) finished");
         }
         break;
+    case SCMI_SYS_POWER_STATE_SUSPEND:
+        /*
+         * AP suspend does not suspend the always-on RSE. This is an
+         * advisory notification, not a request to reload AP firmware or
+         * reinitialise the retained SCMI transport. SCP owns the power
+         * transition and wake sequencing; receiving this notification
+         * does not establish that AP power-off has completed.
+         */
+        SCMI_LOG_INF("AP suspend notification received; RSE remains active");
+        break;
     case SCMI_SYS_POWER_STATE_POWER_UP:
     default:
         SCMI_LOG_ERR("Unsupported command");
