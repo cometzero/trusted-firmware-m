@@ -991,9 +991,11 @@ static int boot_platform_post_load_si_cl0(void)
     /* Introduce a startup delay to ensure SI CL1 has enough time to begin
      * booting and finish the PFDI Out-of-Reset(OOR) sequence before subsequent
      * steps run. */
+#if !APOLLO_FVP_ISOLATE_CL1
     if (check_si_cl1_is_present()) {
         delay_cycles(CL1_BOOT_WAIT_CYCLES);
     }
+#endif
     return 0;
 }
 
@@ -1146,6 +1148,14 @@ bool boot_platform_should_load_image(uint32_t image_id)
             BOOT_LOG_ERR("BL2: SI PIK power-on/pre-load failed");
             return false;
         }
+#if APOLLO_FVP_ISOLATE_CL1
+        /* Preserve shared SI/CL0 initialization above, but never enter the
+         * CL1 image pre-load hook that powers its cluster for LLRAM access.
+         * Hardware presence, firmware IDs and other images are unchanged.
+         */
+        BOOT_LOG_INF("BL2: diagnostic CL1 isolation, skip image and cluster power-on");
+        return false;
+#endif
         /* Check if SI CL1 is present */
         if (!check_si_cl1_is_present()) {
             BOOT_LOG_INF("BL2: SI CL1 not present, skip loading");

@@ -138,6 +138,10 @@ target_include_directories(platform_bl2
         $<$<BOOL:${RSE_USE_HOST_UART}>:${PLATFORM_DIR}/ext/target/arm/drivers/usart/pl011>
 )
 
+option(APOLLO_FVP_ISOLATE_CL1 "Diagnostic: leave CL1 unbooted and unpowered" OFF)
+target_compile_definitions(platform_bl2 PRIVATE
+    APOLLO_FVP_ISOLATE_CL1=$<BOOL:${APOLLO_FVP_ISOLATE_CL1}>)
+
 target_compile_definitions(platform_bl2
     PRIVATE
         $<$<BOOL:${PLATFORM_HOST_HAS_SI_CL}>:PLATFORM_HOST_HAS_SI_CL>
