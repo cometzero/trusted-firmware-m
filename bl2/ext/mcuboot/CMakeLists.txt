@@ -254,6 +254,9 @@ if (PLATFORM_DEFAULT_IMAGE_SIGNING)
 
     set(wrapper_depends
         DEPENDS tfm_s_bin signing_layout_s
+        # The custom target only orders the build. Re-sign when the raw image
+        # changes too, otherwise an incremental build can install stale code.
+        DEPENDS $<TARGET_FILE_DIR:tfm_s>/tfm_s.bin
         DEPENDS $<IF:$<BOOL:${MCUBOOT_GENERATE_SIGNING_KEYPAIR}>,generated_private_key,>
         DEPENDS $<$<BOOL:${MCUBOOT_ENC_IMAGES}>:${MCUBOOT_KEY_ENC}>
         WORKING_DIRECTORY ${MCUBOOT_PATH}/scripts
