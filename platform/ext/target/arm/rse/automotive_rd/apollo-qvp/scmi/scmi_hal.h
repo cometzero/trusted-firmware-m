@@ -20,6 +20,8 @@ extern "C" {
 
 #ifdef SCMI_COMMS_FOR_BL2_POLLING_MODE
 #define SCMI_HAL_WAIT_TIME 1000000
+uint64_t scmi_hal_counter_ticks(void);
+uint32_t scmi_hal_counter_frequency(void);
 #endif /* SCMI_COMMS_FOR_BL2_POLLING_MODE */
 
 #ifdef SCMI_COMMS_FOR_RUNTIME_IRQ_NOTIFICATIONS

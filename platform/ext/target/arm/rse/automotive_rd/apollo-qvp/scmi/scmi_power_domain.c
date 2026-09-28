@@ -79,19 +79,8 @@ scmi_comms_err_t scmi_comm_get_power_domain_version(uint32_t *version)
 
     scmi_message_power_domain_protocol_version(&msg);
 
-    err = transport_send(&msg);
-    if (err != SCMI_COMMS_SUCCESS) {
-        return err;
-    }
-
-    /* wait a while and check the mhu mbx flag */
-    scmi_hal_wait(SCMI_HAL_WAIT_TIME);
-    err = transport_wait();
-    if (err != SCMI_COMMS_SUCCESS) {
-        return err;
-    }
-
-    err = transport_receive(&msg);
+    /* QVP firmware startup margin, not a hardware safety/FTTI claim. */
+    err = transport_exchange(&msg, 10);
     if (err != SCMI_COMMS_SUCCESS) {
         return err;
     }

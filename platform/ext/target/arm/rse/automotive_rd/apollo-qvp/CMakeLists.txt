@@ -126,6 +126,7 @@ target_sources(platform_bl2
         $<$<BOOL:${PLATFORM_HOST_HAS_SI_CL}>:${CMAKE_CURRENT_SOURCE_DIR}/host_drivers/scr_drv.c>
         scmi/scmi_hal.c
         scmi/scmi_power_domain.c
+        ${PLATFORM_DIR}/ext/target/arm/drivers/timer/armv8m/systimer_armv8-m_drv.c
         $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/cfi/cfi_drv.c>
         $<$<BOOL:${PLATFORM_HAS_STRATA_FLASH}>:${PLATFORM_DIR}/ext/target/arm/drivers/flash/strata/spi_strataflashj3_flash_lib.c>
         ${PLATFORM_DIR}/ext/target/arm/rse/common/fip_parser/fip_parser.c

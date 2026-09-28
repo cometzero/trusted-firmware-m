@@ -98,6 +98,12 @@ uint32_t scmi_message_header(uint8_t message_id, uint8_t message_type,
  */
 scmi_comms_err_t scmi_comm_init(void);
 
+/* BL2 startup RPC: one outstanding command, including late responses and
+ * completer mailbox initialization. timeout_s is a simulation startup budget.
+ */
+scmi_comms_err_t transport_exchange(struct scmi_message_t *msg,
+                                   uint32_t timeout_s);
+
 /**
  * \brief Abort the last scmi comm transaction. It clears the internal
  * status/flags of the transport layers.

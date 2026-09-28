@@ -227,6 +227,19 @@ scmi_comms_err_t scmi_hal_doorbell_read(uint32_t *value)
 }
 
 #ifdef SCMI_COMMS_FOR_BL2_POLLING_MODE
+uint64_t scmi_hal_counter_ticks(void)
+{
+    return systimer_armv8_m_get_counter_value(&SYSTIMER0_ARMV8_M_DEV_S);
+}
+
+uint32_t scmi_hal_counter_frequency(void)
+{
+    /* Apollo QVP TIMER0 physical counter; CNTFRQ is software-writable metadata.
+     * Do not initialize/reprogram the timer or its interrupt for polling.
+     */
+    return UINT32_C(125000000);
+}
+
 void scmi_hal_wait(uint32_t cycles)
 {
     while (cycles--) {

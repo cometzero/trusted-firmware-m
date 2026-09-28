@@ -33,9 +33,6 @@
 
 #include <string.h>
 
-#define SCMI_BUSY_WAIT_CYCLES       10000000
-#define MAX_RETRIES_PROTOCOL_VER    3
-
 #define LBIST_WAIT_CYCLES           12500000
 #define MBIST_WAIT_CYCLES           10000000
 
@@ -497,20 +494,16 @@ static int boot_platform_pre_load_ap_bl2(void)
     }
 
     /* Check if SCP SCMI service is live? */
-    for (uint8_t retries = 0; retries < MAX_RETRIES_PROTOCOL_VER; retries++) {
+    {
         uint32_t scmi_protocol_version;
 
-        BOOT_LOG_INF("BL2: Getting SCMI power domain protocol version...");
+        BOOT_LOG_INF("BL2: Getting SCMI power domain protocol version (10s startup budget)...");
         scmi_err = scmi_comm_get_power_domain_version(&scmi_protocol_version);
 
         if (scmi_err == SCMI_COMMS_SUCCESS) {
             BOOT_LOG_INF("BL2: SCP ready. Power domain protocol version = 0x%x.",
                             scmi_protocol_version);
-            break;
         }
-        BOOT_LOG_INF("BL2: Failed to get protocol version, retrying...");
-        BOOT_LOG_INF("BL2: Busy wait...");
-        scmi_hal_wait(SCMI_BUSY_WAIT_CYCLES);
     }
 
     if (scmi_err != SCMI_COMMS_SUCCESS) {
